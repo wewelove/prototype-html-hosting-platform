@@ -5,6 +5,8 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-111827.svg)](https://nextjs.org/)
 [![React 19](https://img.shields.io/badge/React-19-087ea4.svg)](https://react.dev/)
 
+![产品经理猪有解｜开源 AI 工具与产品方法](./docs/images/brand-banner.png)
+
 一个面向各行业产品经理、设计师和产品团队的开源原型资产托管平台。
 
 在 Vibe Coding（自然语言协同编程）时代，产品经理会快速产出大量 HTML 原型、AI 生成页面和可交互演示；传统工作中也仍有大量 Axure 导出的 HTML 文件夹。文件如果长期散落在本地、网盘和聊天记录中，版本、访问入口、权限和复用价值都会迅速失控。
