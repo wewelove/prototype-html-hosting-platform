@@ -1,25 +1,19 @@
 import nextEnv from "@next/env";
-import pg from "pg";
+import { hashSync } from "bcryptjs";
+import { randomUUID } from "node:crypto";
+import { openDatabase, resolveDatabaseFile } from "./sqlite.mjs";
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
-const required = ["DATABASE_URL"];
-const missing = required.filter((name) => !process.env[name]);
-if (missing.length) {
-  console.error(`缺少环境变量：${missing.join(", ")}`);
-  process.exit(1);
-}
+const database = openDatabase(resolveDatabaseFile());
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-const client = await pool.connect();
 try {
-  await client.query("begin");
-  const existing = await client.query("select 1 from users limit 1");
-  if (existing.rowCount) {
-    await client.query("rollback");
+  database.exec("begin immediate");
+  const existing = database.prepare("select 1 from users limit 1").get();
+  if (existing) {
+    database.exec("rollback");
     console.log("系统已有用户，已跳过超级管理员初始化。");
-    process.exitCode = 0;
   } else {
     const account = process.env.BOOTSTRAP_SUPER_ADMIN_ACCOUNT?.trim().toLowerCase();
     const password = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD;
@@ -27,33 +21,39 @@ try {
       throw new Error("首次启动时必须设置超级管理员账号及至少 8 位初始密码");
     }
     const departmentName = process.env.BOOTSTRAP_DEPARTMENT_NAME || "产品中心";
-    const department = await client.query(
-      `insert into departments (name, sort_order) values ($1, 1)
-       returning id`,
-      [departmentName],
-    );
-    await client.query(
-      `insert into users (account, password_hash, name, department_id, role)
-       values ($1, crypt($2, gen_salt('bf', 10)), $3, $4, 'super_admin')`,
-      [
+    const departmentId = randomUUID();
+    database
+      .prepare("insert into departments (id, name, sort_order) values (?, ?, 1)")
+      .run(departmentId, departmentName);
+    database
+      .prepare(
+        `insert into users (id, account, password_hash, name, department_id, role)
+         values (?, ?, ?, ?, ?, 'super_admin')`,
+      )
+      .run(
+        randomUUID(),
         account,
-        password,
+        hashSync(password, 10),
         process.env.BOOTSTRAP_SUPER_ADMIN_NAME || "系统管理员",
-        department.rows[0].id,
-      ],
-    );
-    await client.query(
-      `insert into business_categories (name, sort_order) values
-       ('企业服务', 10), ('协作工具', 20), ('数据产品', 30)
+        departmentId,
+      );
+    const insertCategory = database.prepare(
+      `insert into business_categories (id, name, sort_order) values (?, ?, ?)
        on conflict (name) do nothing`,
     );
-    await client.query("commit");
+    for (const [name, sortOrder] of [["企业服务", 10], ["协作工具", 20], ["数据产品", 30]]) {
+      insertCategory.run(randomUUID(), name, sortOrder);
+    }
+    database.exec("commit");
     console.log(`超级管理员 ${account} 初始化完成。`);
   }
 } catch (error) {
-  await client.query("rollback").catch(() => undefined);
+  try {
+    database.exec("rollback");
+  } catch {
+    // 事务可能已经结束。
+  }
   throw error;
 } finally {
-  client.release();
-  await pool.end();
+  database.close();
 }

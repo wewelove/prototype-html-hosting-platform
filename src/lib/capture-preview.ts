@@ -92,11 +92,11 @@ function resolveChromiumExecutable() {
 }
 
 async function performCapture(projectId: string, htmlPath: string, ownerId: string) {
-  const pending = await query<{ exists: boolean }>(
-    "select exists(select 1 from projects where id = $1 and html_path = $2) as exists",
+  const pending = await query<{ matched: number }>(
+    "select exists(select 1 from projects where id = $1 and html_path = $2) as matched",
     [projectId, htmlPath],
   );
-  if (!pending.rows[0]?.exists) return;
+  if (!pending.rows[0]?.matched) return;
 
   const executablePath = resolveChromiumExecutable();
   if (!executablePath) throw new Error("未找到 Chromium/Chrome 可执行文件");
@@ -135,7 +135,7 @@ async function performCapture(projectId: string, htmlPath: string, ownerId: stri
     previewPath = await writePreviewFile(ownerId, projectId, image);
     const result = await withTransaction(async (client) => {
       const current = await client.query<{ preview_path: string | null }>(
-        "select preview_path from projects where id = $1 and html_path = $2 for update",
+        "select preview_path from projects where id = $1 and html_path = $2",
         [projectId, htmlPath],
       );
       if (!current.rows[0]) return { committed: false, previousPreviewPath: null };
@@ -160,11 +160,11 @@ async function performCapture(projectId: string, htmlPath: string, ownerId: stri
     }
   } catch (error) {
     if (previewPath && !committed) await removeStoredFile(previewPath).catch(() => undefined);
-    const current = await query<{ exists: boolean }>(
-      "select exists(select 1 from projects where id = $1 and html_path = $2) as exists",
+    const current = await query<{ matched: number }>(
+      "select exists(select 1 from projects where id = $1 and html_path = $2) as matched",
       [projectId, htmlPath],
     ).catch(() => null);
-    if (current && !current.rows[0]?.exists) return;
+    if (current && !current.rows[0]?.matched) return;
     const message = error instanceof Error ? error.message.slice(0, 500) : "未知错误";
     await query(
       "update projects set preview_status = 'failed', preview_error = $1 where id = $2 and html_path = $3",

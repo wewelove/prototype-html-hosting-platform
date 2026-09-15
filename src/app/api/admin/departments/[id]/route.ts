@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { listDepartments } from "@/lib/data";
-import { query } from "@/lib/db";
+import { isUniqueConstraintError, query, type DbValue } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { rejectInvalidOrigin } from "@/lib/security";
@@ -64,7 +64,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       if (parsed.data.parentId !== undefined) current.parentId = parsed.data.parentId;
       if (parsed.data.name) current.name = parsed.data.name;
     } else {
-      const values: unknown[] = [];
+      const values: DbValue[] = [];
       const assignments = ["updated_at = now()"];
       if (parsed.data.name) {
         values.push(parsed.data.name);
@@ -79,7 +79,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const duplicate = typeof error === "object" && error && "code" in error && error.code === "23505";
+    const duplicate = isUniqueConstraintError(error);
     return NextResponse.json({ message: duplicate ? "同级部门名称已存在" : "部门保存失败" }, { status: duplicate ? 409 : 400 });
   }
 }

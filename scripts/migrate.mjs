@@ -1,45 +1,42 @@
 import nextEnv from "@next/env";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
-import pg from "pg";
+import { openDatabase, resolveDatabaseFile } from "./sqlite.mjs";
 
 const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
-if (!process.env.DATABASE_URL) {
-  console.error("缺少环境变量：DATABASE_URL");
-  process.exit(1);
-}
+const databaseFile = resolveDatabaseFile();
+const database = openDatabase(databaseFile);
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
-const client = await pool.connect();
 try {
-  await client.query("select pg_advisory_lock(8072026)");
-  await client.query(`
+  database.exec(`
     create table if not exists schema_migrations (
       version text primary key,
-      applied_at timestamptz not null default now()
+      applied_at text not null
     )
   `);
+
   const migrationDir = path.join(process.cwd(), "database", "migrations");
   const files = (await readdir(migrationDir)).filter((name) => name.endsWith(".sql")).sort();
   for (const file of files) {
-    const applied = await client.query("select 1 from schema_migrations where version = $1", [file]);
-    if (applied.rowCount) continue;
+    const applied = database.prepare("select 1 from schema_migrations where version = ?").get(file);
+    if (applied) continue;
     const sql = await readFile(path.join(migrationDir, file), "utf8");
-    await client.query("begin");
+    database.exec("begin immediate");
     try {
-      await client.query(sql);
-      await client.query("insert into schema_migrations (version) values ($1)", [file]);
-      await client.query("commit");
+      database.exec(sql);
+      database
+        .prepare("insert into schema_migrations (version, applied_at) values (?, ?)")
+        .run(file, new Date().toISOString());
+      database.exec("commit");
       console.log(`已应用数据库迁移：${file}`);
     } catch (error) {
-      await client.query("rollback");
+      database.exec("rollback");
       throw error;
     }
   }
+  console.log(`SQLite 数据库结构已是最新：${databaseFile}`);
 } finally {
-  await client.query("select pg_advisory_unlock(8072026)").catch(() => undefined);
-  client.release();
-  await pool.end();
+  database.close();
 }

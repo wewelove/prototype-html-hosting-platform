@@ -5,7 +5,7 @@ import { z } from "zod";
 import { withBasePath } from "@/lib/app-path";
 import { DEMO_SESSION_COOKIE } from "@/lib/auth";
 import { verifyCaptchaToken } from "@/lib/captcha";
-import { withTransaction } from "@/lib/db";
+import { isUniqueConstraintError, withTransaction } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { env, isDemoMode } from "@/lib/env";
 import { getClientIp, rejectInvalidOrigin } from "@/lib/security";
@@ -99,10 +99,9 @@ export async function POST(request: Request) {
 
   try {
     const userId = await withTransaction(async (client) => {
-      const invitation = await client.query(
+      const invitation = await client.query<{ id: string }>(
         `select id from invitation_codes
-          where code = $1 and used_at is null and expires_at > now()
-          for update`,
+          where code = $1 and used_at is null and expires_at > now()`,
         [invitationCode],
       );
       if (!invitation.rows[0]) throw new Error("INVITATION_INVALID");
@@ -136,7 +135,7 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === "DEPARTMENT_INVALID") {
       return NextResponse.json({ message: "所选部门不存在" }, { status: 400 });
     }
-    if (typeof error === "object" && error && "code" in error && error.code === "23505") {
+    if (isUniqueConstraintError(error)) {
       return NextResponse.json({ message: "该账号已存在" }, { status: 409 });
     }
     console.error("注册失败", error);

@@ -25,10 +25,6 @@ function bytes(value: number) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function dateTime(value: string | null | undefined) {
-  return value ? new Date(value).toLocaleString("zh-CN", { hour12: false }) : "暂无记录";
-}
-
 export function AnalyticsDashboard({
   stats,
   projects,
@@ -75,14 +71,6 @@ export function AnalyticsDashboard({
   const storage = storageBudget.diskUsedBytes;
   const storageLimit = storageBudget.diskTotalBytes;
   const percent = storageLimit > 0 ? Math.min(100, (storage / storageLimit) * 100) : 100;
-  const backup = storageBudget.backupStatus;
-  const backupLabel = backup?.status === "success"
-    ? "数据库备份正常"
-    : backup?.status === "running"
-      ? "数据库备份执行中"
-      : backup?.status === "failed"
-        ? "数据库备份异常"
-        : "数据库备份状态未接入";
   const [logPage, setLogPage] = useState(1);
   const [logPageSize, setLogPageSize] = useState(20);
   const logPageCount = Math.max(1, Math.ceil(logs.length / logPageSize));
@@ -148,7 +136,7 @@ export function AnalyticsDashboard({
         <section className="analytics-section">
           <header>
             <h2>存储预算</h2>
-            <span>{backupLabel}</span>
+            <span>按服务器整盘统计</span>
           </header>
           <div className="storage-overview">
             <span className="storage-icon">
@@ -166,11 +154,7 @@ export function AnalyticsDashboard({
           <div className="budget-rules">
             <p>
               <b>原型文件</b>
-              <span>{bytes(storageBudget.prototypeDiskBytes)}</span>
-            </p>
-            <p>
-              <b>本机数据库备份</b>
-              <span>{bytes(storageBudget.backupRepositoryBytes)}</span>
+              <span>{bytes(storageBudget.prototypeUsedBytes)}</span>
             </p>
             <p>
               <b>系统/数据库/其他</b>
@@ -188,19 +172,6 @@ export function AnalyticsDashboard({
               <b>当前可继续上传</b>
               <span>{bytes(storageBudget.uploadAvailableBytes)}</span>
             </p>
-          </div>
-          <div className="backup-status-summary">
-            <span>最近数据库备份：{dateTime(backup?.lastSuccessAt)}</span>
-            <span>快照：{backup?.snapshotId ?? "暂无"}</span>
-            <span>
-              最近数据库恢复验证：{backup?.lastRestoreVerificationStatus === "success"
-                ? dateTime(backup.lastRestoreVerifiedAt)
-                : backup?.lastRestoreVerificationStatus === "running"
-                  ? "执行中"
-                  : backup?.lastRestoreVerificationStatus === "failed"
-                    ? "失败"
-                    : "尚未执行"}
-            </span>
           </div>
         </section>
       </div>

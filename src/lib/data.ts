@@ -1,4 +1,4 @@
-import { query } from "@/lib/db";
+import { numberedPlaceholders, query } from "@/lib/db";
 import { withBasePath } from "@/lib/app-path";
 import { demoStore, getDemoStats } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
@@ -72,8 +72,10 @@ export async function listGroupsForOwners(ownerIds: string[]): Promise<Prototype
   if (isDemoMode) return demoStore.groups.filter((group) => ownerIds.includes(group.ownerId));
   const result = await query(
     `select id, owner_id, parent_id, name, sort_order
-       from prototype_groups where owner_id = any($1::uuid[]) order by sort_order, name`,
-    [ownerIds],
+       from prototype_groups
+      where owner_id in (${numberedPlaceholders(ownerIds.length)})
+      order by sort_order, name`,
+    ownerIds,
   );
   return result.rows.map(mapGroup);
 }
@@ -150,9 +152,13 @@ export async function listProjectsForDepartments(
       .filter((project) => departmentIds.has(project.departmentId))
       .map((project) => ({ ...project, sharePassword: demoStore.sharePasswords.get(project.id) ?? null }));
   }
+  // SQLite 不支持数组参数，使用编号占位符展开部门列表。
+  const departmentIdList = [...departmentIds];
   const result = await query(
-    `${projectSelect} where p.department_id = any($1::uuid[]) order by p.updated_at desc`,
-    [[...departmentIds]],
+    `${projectSelect}
+      where p.department_id in (${numberedPlaceholders(departmentIdList.length)})
+      order by p.updated_at desc`,
+    departmentIdList,
   );
   return result.rows.map((row) => mapProject(row, true));
 }
@@ -250,22 +256,22 @@ export async function listInvitations(): Promise<InvitationCode[]> {
 export async function getPlatformStats(): Promise<PlatformStats> {
   if (isDemoMode) return getDemoStats();
   const result = await query<{
-    pv: string;
-    uv: string;
-    uploads: string;
-    updates: string;
-    logins: string;
-    projects: string;
-    storage_bytes: string;
+    pv: number;
+    uv: number;
+    uploads: number;
+    updates: number;
+    logins: number;
+    projects: number;
+    storage_bytes: number;
   }>(`
     select
-      (select count(*) from project_visits)::text as pv,
-      (select count(distinct coalesce(user_id::text, visitor_key)) from project_visits)::text as uv,
-      (select count(*) from platform_events where event_type = 'upload')::text as uploads,
-      (select count(*) from platform_events where event_type = 'update')::text as updates,
-      (select count(*) from login_logs where success = true)::text as logins,
-      (select count(*) from projects)::text as projects,
-      (select coalesce(sum(file_size + preview_size), 0) from projects)::text as storage_bytes
+      (select count(*) from project_visits) as pv,
+      (select count(distinct coalesce(user_id, visitor_key)) from project_visits) as uv,
+      (select count(*) from platform_events where event_type = 'upload') as uploads,
+      (select count(*) from platform_events where event_type = 'update') as updates,
+      (select count(*) from login_logs where success = true) as logins,
+      (select count(*) from projects) as projects,
+      (select coalesce(sum(file_size + preview_size), 0) from projects) as storage_bytes
   `);
   const row = result.rows[0];
   return {
@@ -300,29 +306,31 @@ export async function getScopedPlatformStats(
   if (departmentIds.size === 0) {
     return { pv: 0, uv: 0, uploads: 0, updates: 0, logins: 0, projects: 0, storageBytes: 0 };
   }
+  const departmentIdList = [...departmentIds];
+  const placeholders = numberedPlaceholders(departmentIdList.length);
   const result = await query<{
-    pv: string;
-    uv: string;
-    uploads: string;
-    updates: string;
-    logins: string;
-    projects: string;
-    storage_bytes: string;
+    pv: number;
+    uv: number;
+    uploads: number;
+    updates: number;
+    logins: number;
+    projects: number;
+    storage_bytes: number;
   }>(
     `with scoped_projects as (
-       select id, file_size, preview_size from projects where department_id = any($1::uuid[])
+       select id, file_size, preview_size from projects where department_id in (${placeholders})
      ), scoped_users as (
-       select id from users where department_id = any($1::uuid[])
+       select id from users where department_id in (${placeholders})
      )
      select
-       (select count(*) from project_visits where project_id in (select id from scoped_projects))::text as pv,
-       (select count(distinct coalesce(user_id::text, visitor_key)) from project_visits where project_id in (select id from scoped_projects))::text as uv,
-       (select count(*) from platform_events where event_type = 'upload' and user_id in (select id from scoped_users))::text as uploads,
-       (select count(*) from platform_events where event_type = 'update' and user_id in (select id from scoped_users))::text as updates,
-       (select count(*) from login_logs where success = true and user_id in (select id from scoped_users))::text as logins,
-       (select count(*) from scoped_projects)::text as projects,
-       (select coalesce(sum(file_size + preview_size), 0) from scoped_projects)::text as storage_bytes`,
-    [[...departmentIds]],
+       (select count(*) from project_visits where project_id in (select id from scoped_projects)) as pv,
+       (select count(distinct coalesce(user_id, visitor_key)) from project_visits where project_id in (select id from scoped_projects)) as uv,
+       (select count(*) from platform_events where event_type = 'upload' and user_id in (select id from scoped_users)) as uploads,
+       (select count(*) from platform_events where event_type = 'update' and user_id in (select id from scoped_users)) as updates,
+       (select count(*) from login_logs where success = true and user_id in (select id from scoped_users)) as logins,
+       (select count(*) from scoped_projects) as projects,
+       (select coalesce(sum(file_size + preview_size), 0) from scoped_projects) as storage_bytes`,
+    [...departmentIdList, ...departmentIdList],
   );
   const row = result.rows[0];
   return {
@@ -368,8 +376,8 @@ export async function listScopedLoginLogs(userIds: string[]): Promise<LoginLog[]
   const result = await query(
     `select l.id, l.account, l.success, l.ip_address, l.created_at, u.name as user_name
        from login_logs l left join users u on u.id = l.user_id
-      where l.user_id = any($1::uuid[]) order by l.created_at desc`,
-    [userIds],
+      where l.user_id in (${numberedPlaceholders(userIds.length)}) order by l.created_at desc`,
+    userIds,
   );
   return result.rows.map(mapLoginLog);
 }

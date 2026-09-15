@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/data";
-import { query, withTransaction } from "@/lib/db";
+import { query, withTransaction, type DbValue } from "@/lib/db";
 import { getAllowedDepartmentIds } from "@/lib/department-scope";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
@@ -42,9 +42,9 @@ async function wouldRemoveLastSuperAdmin(id: string, nextRole?: string, deleting
       demoStore.users.filter((item) => item.role === "super_admin").length <= 1,
     );
   }
-  const result = await query<{ role: string; count: string }>(
-    `select (select role::text from users where id = $1) as role,
-            (select count(*) from users where role = 'super_admin')::text as count`,
+  const result = await query<{ role: string; count: number }>(
+    `select (select role from users where id = $1) as role,
+            (select count(*) from users where role = 'super_admin') as count`,
     [id],
   );
   const row = result.rows[0];
@@ -102,7 +102,7 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
     return NextResponse.json({ message: "部门不存在" }, { status: 400 });
   }
   await withTransaction(async (client) => {
-    const values: unknown[] = [];
+    const values: DbValue[] = [];
     const assignments = ["updated_at = now()"];
     if (parsed.data.name) {
       values.push(parsed.data.name);
@@ -172,7 +172,7 @@ export async function DELETE(request: Request, routeContext: { params: Promise<{
 
   const projects = await withTransaction(async (client) => {
     const result = await client.query<{ html_path: string; preview_path: string | null }>(
-      "select html_path, preview_path from projects where owner_id = $1 for update",
+      "select html_path, preview_path from projects where owner_id = $1",
       [id],
     );
     await client.query("delete from users where id = $1", [id]);

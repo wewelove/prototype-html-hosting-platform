@@ -42,3 +42,11 @@ export function rejectInvalidOrigin(request: Request) {
   if (isAllowedMutationOrigin(request)) return null;
   return Response.json({ message: "请求来源校验失败" }, { status: 403 });
 }
+
+/** 登录与分享密码校验共用的失败次数统计窗口。 */
+export const FAILURE_WINDOW_MINUTES = 15;
+
+/** 失败次数统计窗口的起始时间，统一使用 ISO 时间字符串与数据库文本字段比较。 */
+export function failureWindowStart(now = Date.now()) {
+  return new Date(now - FAILURE_WINDOW_MINUTES * 60_000).toISOString();
+}

@@ -1,12 +1,12 @@
+import path from "node:path";
 import { appBasePath } from "@/lib/app-path";
 
 const configuredStorageReserveRatio = Number(process.env.STORAGE_RESERVE_RATIO ?? "0.2");
+const dataDir = process.env.DATA_DIR ?? ".data";
 
 export const env = {
-  databaseUrl: process.env.DATABASE_URL,
-  databasePoolMax: Number(process.env.DATABASE_POOL_MAX ?? 5),
-  dataDir: process.env.DATA_DIR ?? ".data",
-  backupStatusDir: process.env.BACKUP_STATUS_DIR,
+  dataDir,
+  databaseFile: process.env.DATABASE_FILE ?? path.join(dataDir, "prototype-hub.sqlite3"),
   manageUrl:
     process.env.MANAGE_URL ??
     process.env.NEXT_PUBLIC_MANAGE_URL ??
@@ -29,7 +29,7 @@ export const env = {
       : 0.2,
 };
 
-const databaseConfigured = Boolean(env.databaseUrl);
+const databaseConfigured = Boolean(process.env.DATABASE_FILE);
 
 export const isDemoMode =
   process.env.NODE_ENV !== "production" &&
@@ -37,6 +37,6 @@ export const isDemoMode =
 
 export function assertDatabaseConfigured() {
   if (!databaseConfigured) {
-    throw new Error("缺少 DATABASE_URL，无法连接 PostgreSQL 数据库");
+    throw new Error("缺少 DATABASE_FILE，无法打开 SQLite 数据库");
   }
 }

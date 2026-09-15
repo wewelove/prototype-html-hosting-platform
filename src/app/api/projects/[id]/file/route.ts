@@ -85,12 +85,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       const current = await client.query<{
         html_path: string;
         preview_path: string | null;
-        file_size: string;
-        preview_size: string;
+        file_size: number;
+        preview_size: number;
         name: string;
       }>(
         `select html_path, preview_path, file_size, preview_size, name
-           from projects where id = $1 for update`,
+           from projects where id = $1`,
         [project.id],
       );
       if (!current.rows[0]) throw new Error("PROJECT_NOT_FOUND");

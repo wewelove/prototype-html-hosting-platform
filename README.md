@@ -66,7 +66,7 @@
 
 ### 平台数据与运行状态
 
-查看原型 PV、UV、上传与更新次数、访问排行、磁盘预算、备份状态和登录日志。
+查看原型 PV、UV、上传与更新次数、访问排行、磁盘预算和登录日志。
 
 ![平台数据](./docs/images/08-analytics.png)
 
@@ -82,52 +82,49 @@
 | 权限模型 | 超级管理员、管理员、普通用户三级角色 |
 | 平台治理 | 邀请码注册、部门人员、账号状态、强制改密、存储配额 |
 | 数据统计 | PV、UV、上传/更新次数、原型排行、登录日志、磁盘预算 |
-| 运维保障 | 健康检查、Docker Compose、Caddy HTTPS、Restic 数据库备份与隔离恢复验证 |
+| 运维保障 | 健康检查、Docker Compose、Caddy HTTPS、SQLite 单文件数据库与数据卷持久化 |
 
 ## 技术方案
 
 | 组件 | 职责 |
 | --- | --- |
 | **Next.js 16 + React 19 + TypeScript** | 管理端、原型访问页和服务端 API |
-| **PostgreSQL 16** | 账号、部门、权限、原型元数据、访问量和日志 |
-| **本地持久化磁盘** | HTML 原型文件、关联静态资源和 WebP 首页截图 |
+| **SQLite（Node.js 内置 `node:sqlite`）** | 账号、部门、权限、原型元数据、访问量和日志，单文件随数据卷持久化 |
+| **本地持久化磁盘** | SQLite 数据库文件、HTML 原型文件、关联静态资源和 WebP 首页截图 |
 | **Caddy** | 按域名转发，并自动申请和续期 HTTPS 证书 |
-| **Docker Compose** | 一次启动应用、PostgreSQL、Caddy 网关和备份服务 |
-| **Restic** | 本机保存最近 7 个 PostgreSQL 每日备份；失败自动重试，并支持定期隔离恢复验证 |
-| **阿里云云备份** | 在云厂商侧对服务器文件做异地备份，其中可包含原型文件、预览图和本机备份仓库 |
+| **Docker Compose** | 一次启动应用与 Caddy 网关，无需额外数据库容器 |
+| **数据卷快照 / 阿里云云备份** | 在云厂商侧对整个数据卷做异地加密副本 |
 | **Vitest + Playwright** | 单元测试、接口验证和端到端流程检查 |
 
 ```mermaid
 flowchart LR
     U["产品经理 / 评审人员"] --> C["Caddy\n域名与 HTTPS"]
     C --> A["Next.js 16\n页面与 API"]
-    A --> P[("PostgreSQL 16\n业务数据与文件路径")]
-    A --> D[("持久化磁盘\nHTML / 静态资源 / WebP")]
-    B["备份容器"] -->|pg_dump| P
-    B --> R[("Restic 仓库\n最近 7 个每日备份")]
-    Y["阿里云云备份\n或其他云备份服务"] -.异地备份.-> D
-    Y -.异地备份.-> R
+    A --> S[("SQLite 单文件\n业务数据与文件路径")]
+    A --> D[("持久化数据卷\n数据库 / HTML / 静态资源 / WebP")]
+    S --- D
+    Y["数据卷快照 / 阿里云云备份\n或其他云备份服务"] -.异地备份.-> D
 ```
 
 ### 数据存储边界
 
-HTML 原型内容**不写入数据库字段**。PostgreSQL 只保存账号、权限、原型名称、业务信息、访问统计和文件路径；HTML、JavaScript、CSS、图片等原型文件，以及自动生成的 WebP 预览图，存放在服务器持久化卷中。
+HTML 原型内容**不写入数据库字段**。SQLite 只保存账号、权限、原型名称、业务信息、访问统计和文件路径；HTML、JavaScript、CSS、图片等原型文件，以及自动生成的 WebP 预览图，存放在服务器持久化卷中。
 
-这种设计避免大文件挤占数据库，也方便对文件资产和数据库采用不同的备份策略。项目可部署到阿里云、腾讯云、华为云或其他能够运行 Docker 的 Ubuntu 云服务器。
+这种设计避免大文件挤占数据库，也让备份只需覆盖一个数据卷。项目可部署到阿里云、腾讯云、华为云或其他能够运行 Docker 的 Ubuntu 云服务器。
 
-Restic 负责本机 PostgreSQL 日常备份；原型文件和预览图建议使用阿里云云备份、云硬盘快照或其他云厂商文件备份服务做异地保护。云备份需要在对应云厂商控制台单独开通，本仓库不会自动创建或绑定任何云账号资源。
+SQLite 数据库文件默认位于 `prototype_data` 数据卷（可用 `DATABASE_FILE` 调整路径），与原型文件、预览图一起持久化。备份与恢复只需对该数据卷做快照或异机加密副本（建议先 `docker compose -f deploy/compose.yml stop app` 再复制文件）。云备份需要在对应云厂商控制台单独开通，本仓库不会自动创建或绑定任何云账号资源。
 
 ## 目录结构
 
 | 路径 | 用途 |
 | --- | --- |
 | `src/` | 页面、组件、服务端 API 和核心业务逻辑 |
-| `database/` | PostgreSQL 数据库迁移脚本 |
+| `database/` | SQLite 数据库迁移脚本 |
 | `deploy/` | Dockerfile、Docker Compose 与 Caddy 部署配置 |
 | `config/` | ESLint、Vitest 与 Playwright 工具配置 |
-| `docker/`、`scripts/` | 容器启动、数据库初始化和 Restic 备份脚本 |
+| `docker/`、`scripts/` | 容器启动、数据库迁移与超级管理员初始化脚本 |
 | `tests/` | Playwright 端到端测试及测试素材 |
-| `docs/` | 部署、备份说明和功能截图 |
+| `docs/` | 部署说明和功能截图 |
 | `.github/` | 持续集成、贡献指南和安全说明 |
 | 根目录配置文件 | Next.js、TypeScript、npm 和环境变量模板 |
 
@@ -135,7 +132,7 @@ Restic 负责本机 PostgreSQL 日常备份；原型文件和预览图建议使�
 
 ## 本地体验
 
-环境要求：Node.js 22、npm。
+环境要求：Node.js 24（直接使用内置 `node:sqlite` 模块）、npm。
 
 ```bash
 npm ci
@@ -147,16 +144,16 @@ npm run dev
 - 演示账号：`admin`
 - 演示密码：`Prototype@123`
 
-未配置 PostgreSQL 时，本地开发环境使用内存演示数据，重启后会恢复初始状态。演示账号只用于本地体验，生产环境不会启用演示模式。
+未配置 `DATABASE_FILE` 时，本地开发环境使用内存演示数据，重启后会恢复初始状态。演示账号只用于本地体验，生产环境不会启用演示模式。
 
 ## Docker 部署
 
 环境要求：Ubuntu 云服务器、Docker Engine、Docker Compose 插件、已解析到服务器的域名。
 
 1. 基于 `.env.example` 创建 `.env`。
-2. 分别生成数据库密码、会话签名密钥、分享密码加密密钥、Restic 仓库密码和首位管理员密码。
+2. 分别生成会话签名密钥、分享密码加密密钥和首位管理员密码。
 3. 修改域名与管理员信息，禁止沿用示例值。
-4. 启动应用、数据库、网关和备份服务：
+4. 启动应用与网关（SQLite 数据库文件随数据卷自动创建）：
 
 ```bash
 docker compose -f deploy/compose.yml --profile standalone-proxy up -d --build
@@ -168,7 +165,7 @@ docker compose -f deploy/compose.yml --profile standalone-proxy up -d --build
 - 公开原型：`https://你的域名/manage/project/{code}`
 - 分享原型：`https://你的域名/manage/share/{code}`
 
-`NEXT_PUBLIC_BASE_PATH` 在构建时和运行时必须保持一致。详细步骤见 [部署说明](./docs/部署说明.md)、[自动部署说明](./docs/自动部署说明.md)、[同域路径接入说明](./docs/同域路径接入说明.md) 和 [备份与恢复说明](./docs/备份与恢复说明.md)。
+`NEXT_PUBLIC_BASE_PATH` 在构建时和运行时必须保持一致。详细步骤见 [部署说明](./docs/部署说明.md)、[自动部署说明](./docs/自动部署说明.md) 和 [同域路径接入说明](./docs/同域路径接入说明.md)。
 
 ## 质量检查
 
@@ -187,7 +184,7 @@ GitHub Actions 会在推送和 Pull Request 时自动执行代码规范、类型
 - 不要提交 `.env`、数据库文件、SSH Key、真实域名、客户原型或生产数据。
 - 生产环境必须使用独立随机密码，不要使用 README 中的演示账号密码。
 - 分享密码在数据库中采用加密字段保存，登录密码采用不可逆哈希保存。
-- 建议定期执行 Restic 隔离恢复验证，而不仅仅检查“备份任务成功”。
+- 建议定期对 `prototype_data` 数据卷做异地加密副本，并在隔离环境验证可恢复。
 - 安全问题请按 [安全说明](./.github/SECURITY.md) 私下报告。
 
 ## 参与贡献

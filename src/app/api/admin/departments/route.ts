@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { query } from "@/lib/db";
+import { isUniqueConstraintError, query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { rejectInvalidOrigin } from "@/lib/security";
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ department });
   } catch (error) {
-    const duplicate = typeof error === "object" && error && "code" in error && error.code === "23505";
+    const duplicate = isUniqueConstraintError(error);
     return NextResponse.json({ message: duplicate ? "同级部门名称已存在" : "部门创建失败" }, { status: duplicate ? 409 : 400 });
   }
 }

@@ -1,4 +1,4 @@
-FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS dependencies
+FROM public.ecr.aws/docker/library/node:24-bookworm-slim AS dependencies
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -11,7 +11,8 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
     NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 RUN npm run build
 
-FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS runner
+# node:sqlite 内置于 Node 24，无需额外安装原生数据库驱动。
+FROM public.ecr.aws/docker/library/node:24-bookworm-slim AS runner
 WORKDIR /app
 ARG NEXT_PUBLIC_BASE_PATH=/manage
 ENV NODE_ENV=production \

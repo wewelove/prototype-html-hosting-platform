@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectById } from "@/lib/data";
-import { query } from "@/lib/db";
+import { query, type DbValue } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { removeStoredFile, removeStoredPrototype } from "@/lib/file-storage";
@@ -105,9 +105,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     });
   }
 
-  const values: unknown[] = [];
+  const values: DbValue[] = [];
   const assignments = ["updated_at = now()"];
-  const add = (column: string, value: unknown) => {
+  const add = (column: string, value: DbValue) => {
     values.push(value);
     assignments.push(`${column} = $${values.length}`);
   };

@@ -13,23 +13,19 @@ describe("calculatePlatformStorageBudget", () => {
     expect(result.systemAndOtherUsedBytes).toBe(8 * gib);
   });
 
-  it("拆分原型、备份及系统其他占用，同时保持整盘总量一致", () => {
+  it("把原型之外的磁盘占用统一计入系统/数据库/其他", () => {
     const gib = 1024 ** 3;
-    const result = calculatePlatformStorageBudget(2 * gib, 40 * gib, 28 * gib, 0.2, 3 * gib, 2 * gib);
+    const result = calculatePlatformStorageBudget(2 * gib, 40 * gib, 28 * gib);
     expect(result.diskUsedBytes).toBe(12 * gib);
-    expect(result.backupRepositoryBytes).toBe(3 * gib);
-    expect(result.prototypeDiskBytes).toBe(2 * gib);
-    expect(result.systemAndOtherUsedBytes).toBe(7 * gib);
-    expect(result.prototypeUsedBytes + result.backupRepositoryBytes + result.systemAndOtherUsedBytes)
-      .toBe(result.diskUsedBytes);
+    expect(result.systemAndOtherUsedBytes).toBe(10 * gib);
+    expect(result.prototypeUsedBytes + result.systemAndOtherUsedBytes).toBe(result.diskUsedBytes);
   });
 
-  it("原型解压后的实际磁盘占用高于数据库记录时采用较大值", () => {
+  it("原型实际磁盘占用高于数据库记录时以磁盘为准", async () => {
     const gib = 1024 ** 3;
-    const result = calculatePlatformStorageBudget(2 * gib, 40 * gib, 28 * gib, 0.2, 3 * gib, 4 * gib);
+    const result = calculatePlatformStorageBudget(2 * gib, 40 * gib, 28 * gib);
     expect(result.prototypeUsedBytes).toBe(2 * gib);
-    expect(result.prototypeDiskBytes).toBe(4 * gib);
-    expect(result.systemAndOtherUsedBytes).toBe(5 * gib);
+    expect(result.diskAvailableBytes).toBe(28 * gib);
   });
 
   it("磁盘剩余空间低于安全预留时停止新增上传", () => {

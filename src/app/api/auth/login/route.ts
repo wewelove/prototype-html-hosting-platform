@@ -6,7 +6,7 @@ import { DEMO_SESSION_COOKIE } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { env, isDemoMode } from "@/lib/env";
-import { getClientIp, rejectInvalidOrigin } from "@/lib/security";
+import { failureWindowStart, getClientIp, rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
@@ -89,14 +89,14 @@ export async function POST(request: Request) {
     [account],
   );
   const user = result.rows[0];
-  const recentFailures = await query<{ failures: string }>(
-    `select count(*)::text as failures
+  const recentFailures = await query<{ failures: number }>(
+    `select count(*) as failures
        from login_logs
       where account = $1
-        and ip_address is not distinct from $2::inet
+        and ip_address is $2
         and success = false
-        and created_at > now() - interval '15 minutes'`,
-    [account, ipAddress],
+        and created_at > $3`,
+    [account, ipAddress, failureWindowStart()],
   );
   if (Number(recentFailures.rows[0]?.failures ?? 0) >= 10) {
     return NextResponse.json({ message: "登录失败次数过多，请 15 分钟后再试" }, { status: 429 });

@@ -2,7 +2,7 @@ import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { withTransaction } from "@/lib/db";
+import { isUniqueConstraintError, withTransaction } from "@/lib/db";
 import { getAllowedDepartmentIds } from "@/lib/department-scope";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
@@ -92,9 +92,9 @@ export async function POST(request: Request) {
           department_name: string;
           role: UserProfile["role"];
           status: UserProfile["status"];
-          must_change_password: boolean;
+          must_change_password: number;
           temp_password_expires_at: string;
-          storage_quota_bytes: string;
+          storage_quota_bytes: number;
           created_at: string;
         }>(
           `insert into users (
@@ -104,10 +104,10 @@ export async function POST(request: Request) {
            select $1, $2, $3, $4, d.id, $6, $7, true, $8, $9
              from departments d
             where d.id = $5
-           returning id, account::text, name, department_id,
+           returning id, account, name, department_id,
              (select name from departments where id = department_id) as department_name,
              role, status, must_change_password, temp_password_expires_at,
-             storage_quota_bytes::text, created_at`,
+             storage_quota_bytes, created_at`,
           [
             id,
             account,
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ user, tempPassword, expiresAt }, { status: 201 });
   } catch (error) {
-    const duplicate = typeof error === "object" && error && "code" in error && error.code === "23505";
+    const duplicate = isUniqueConstraintError(error);
     const missingDepartment = error instanceof Error && error.message === "DEPARTMENT_NOT_FOUND";
     return NextResponse.json(
       { message: duplicate ? "账号已存在" : missingDepartment ? "部门不存在" : "人员创建失败" },

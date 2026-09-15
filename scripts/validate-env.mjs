@@ -4,7 +4,7 @@ const { loadEnvConfig } = nextEnv;
 loadEnvConfig(process.cwd());
 
 const errors = [];
-if (!process.env.DATABASE_URL) errors.push("缺少 DATABASE_URL");
+if (!process.env.DATABASE_FILE) errors.push("缺少 DATABASE_FILE（SQLite 数据库文件绝对路径）");
 if (!process.env.SESSION_SIGNING_SECRET || process.env.SESSION_SIGNING_SECRET.length < 32) {
   errors.push("SESSION_SIGNING_SECRET 至少需要 32 个字符");
 }

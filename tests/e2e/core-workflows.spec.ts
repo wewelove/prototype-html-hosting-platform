@@ -547,7 +547,6 @@ test("平台数据使用服务器实时磁盘容量", async ({ page }) => {
   const storage = page.locator(".analytics-section").filter({ hasText: "存储预算" });
   await expect(storage).toContainText("服务器整盘已用 / 磁盘总容量");
   await expect(storage).toContainText("原型文件");
-  await expect(storage).toContainText("本机数据库备份");
   await expect(storage).toContainText("系统/数据库/其他");
   await expect(storage).toContainText("磁盘剩余可用");
   await expect(storage).toContainText("系统安全预留");

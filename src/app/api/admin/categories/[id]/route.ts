@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { query, withTransaction } from "@/lib/db";
+import { isUniqueConstraintError, query, withTransaction, type DbValue } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { rejectInvalidOrigin } from "@/lib/security";
@@ -43,7 +43,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       } else {
         const found = await withTransaction(async (client) => {
           const result = await client.query<{ id: string }>(
-            "select id from business_categories order by sort_order, name for update",
+            "select id from business_categories order by sort_order, name",
           );
           const orderedIds = result.rows.map((row) => String(row.id));
           const index = orderedIds.indexOf(id);
@@ -69,7 +69,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       if (!category) return NextResponse.json({ message: "分类不存在" }, { status: 404 });
       Object.assign(category, parsed.data);
     } else {
-      const values: unknown[] = [];
+      const values: DbValue[] = [];
       const assignments = ["updated_at = now()"];
       if (parsed.data.name !== undefined) {
         values.push(parsed.data.name);
@@ -88,7 +88,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const duplicate = typeof error === "object" && error && "code" in error && error.code === "23505";
+    const duplicate = isUniqueConstraintError(error);
     return NextResponse.json({ message: duplicate ? "分类已存在" : "分类保存失败" }, { status: duplicate ? 409 : 400 });
   }
 }

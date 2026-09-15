@@ -9,7 +9,7 @@ import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { env, isDemoMode } from "@/lib/env";
 import { getProjectHtml, recordProjectVisit } from "@/lib/project-content";
-import { getClientIp, rejectInvalidViewerOrigin } from "@/lib/security";
+import { failureWindowStart, getClientIp, rejectInvalidViewerOrigin } from "@/lib/security";
 import { createShareGrant, shareCookieName, verifyShareGrant } from "@/lib/share-session";
 import { attachVisitorCookie, prototypeHtmlResponse, viewerMessagePage } from "@/lib/viewer-response";
 import { resolveVisitorId, VISITOR_COOKIE } from "@/lib/visitor-session";
@@ -60,14 +60,14 @@ export async function GET(
 
 async function isRateLimited(projectId: string, ipAddress: string | null) {
   if (isDemoMode) return false;
-  const result = await query<{ failures: string }>(
-    `select count(*)::text as failures
+  const result = await query<{ failures: number }>(
+    `select count(*) as failures
        from share_password_attempts
       where project_id = $1
-        and ip_address is not distinct from $2::inet
+        and ip_address is $2
         and success = false
-        and created_at > now() - interval '15 minutes'`,
-    [projectId, ipAddress],
+        and created_at > $3`,
+    [projectId, ipAddress, failureWindowStart()],
   );
   return Number(result.rows[0]?.failures ?? 0) >= 10;
 }
