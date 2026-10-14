@@ -7,17 +7,9 @@ const dataDir = process.env.DATA_DIR ?? ".data";
 export const env = {
   dataDir,
   databaseFile: process.env.DATABASE_FILE ?? path.join(dataDir, "prototype-hub.sqlite3"),
-  manageUrl:
-    process.env.MANAGE_URL ??
-    process.env.NEXT_PUBLIC_MANAGE_URL ??
-    `http://localhost:3000${appBasePath}`,
-  demoUrl:
-    process.env.DEMO_URL ??
-    process.env.NEXT_PUBLIC_DEMO_URL ??
-    process.env.MANAGE_URL ??
-    process.env.NEXT_PUBLIC_MANAGE_URL ??
-    "http://localhost:3000",
-  authCookieDomain: process.env.AUTH_COOKIE_DOMAIN,
+  manageUrl: `http://localhost:3000${appBasePath}`,
+  demoUrl: `http://localhost:3000${appBasePath}`,
+  authCookieDomain: undefined,
   chromiumExecutablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
   sessionSigningSecret: process.env.SESSION_SIGNING_SECRET,
   sharePasswordEncryptionKey: process.env.SHARE_PASSWORD_ENCRYPTION_KEY,

@@ -5,8 +5,8 @@ import { DatabaseSync } from "node:sqlite";
 
 /** 与应用保持一致的数据库文件位置解析规则。 */
 export function resolveDatabaseFile() {
-  const dataDir = process.env.DATA_DIR ?? ".data";
-  return process.env.DATABASE_FILE ?? path.join(dataDir, "prototype-hub.sqlite3");
+  const dataDir = process.env.DATA_DIR ?? "/data";
+  return process.env.DATABASE_FILE ?? path.join(dataDir, "axhub.sqlite3");
 }
 
 /**

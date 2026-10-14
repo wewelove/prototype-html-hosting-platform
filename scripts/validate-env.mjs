@@ -14,17 +14,6 @@ if (!process.env.SHARE_PASSWORD_ENCRYPTION_KEY || process.env.SHARE_PASSWORD_ENC
 if (process.env.SHARE_PASSWORD_ENCRYPTION_KEY === process.env.SESSION_SIGNING_SECRET) {
   errors.push("分享密码加密密钥不能与会话签名密钥相同");
 }
-for (const name of ["MANAGE_URL", "DEMO_URL"]) {
-  const value = process.env[name];
-  try {
-    if (!value || new URL(value).protocol !== "https:") throw new Error();
-  } catch {
-    errors.push(`${name} 必须是有效的 HTTPS 地址`);
-  }
-}
-if (!process.env.AUTH_COOKIE_DOMAIN?.startsWith(".")) {
-  errors.push("AUTH_COOKIE_DOMAIN 必须是以点开头的根域名，例如 .example.com");
-}
 
 if (errors.length) {
   console.error(`生产环境配置校验失败：\n- ${errors.join("\n- ")}`);

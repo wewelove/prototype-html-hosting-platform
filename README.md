@@ -1,4 +1,4 @@
-# 原型html托管平台
+# 原型 html 托管平台
 
 [![持续集成检查](https://github.com/lin96008-maxlin/prototype-html-hosting-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/lin96008-maxlin/prototype-html-hosting-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-16a34a.svg)](./LICENSE)
@@ -12,8 +12,6 @@
 在 Vibe Coding（自然语言协同编程）时代，产品经理会快速产出大量 HTML 原型、AI 生成页面和可交互演示；传统工作中也仍有大量 Axure 导出的 HTML 文件夹。文件如果长期散落在本地、网盘和聊天记录中，版本、访问入口、权限和复用价值都会迅速失控。
 
 原型html托管平台把这些文件产物转化为可持续管理的团队资产：统一上传、自动生成首页预览图、在线访问、版本更新、链接分享、访问密码、团队内公开共享、公开广场和使用数据统计。
-
-**在线体验：** [https://www.pm-vibe.com/demo](https://www.pm-vibe.com/demo)
 
 ![登录与产品定位](./docs/images/01-login.png)
 
@@ -91,15 +89,13 @@
 | **Next.js 16 + React 19 + TypeScript** | 管理端、原型访问页和服务端 API |
 | **SQLite（Node.js 内置 `node:sqlite`）** | 账号、部门、权限、原型元数据、访问量和日志，单文件随数据卷持久化 |
 | **本地持久化磁盘** | SQLite 数据库文件、HTML 原型文件、关联静态资源和 WebP 首页截图 |
-| **Caddy** | 按域名转发，并自动申请和续期 HTTPS 证书 |
-| **Docker Compose** | 一次启动应用与 Caddy 网关，无需额外数据库容器 |
+| **Docker Compose** | 一次启动应用，无需额外数据库容器 |
 | **数据卷快照 / 阿里云云备份** | 在云厂商侧对整个数据卷做异地加密副本 |
 | **Vitest + Playwright** | 单元测试、接口验证和端到端流程检查 |
 
 ```mermaid
 flowchart LR
-    U["产品经理 / 评审人员"] --> C["Caddy\n域名与 HTTPS"]
-    C --> A["Next.js 16\n页面与 API"]
+    U["产品经理 / 评审人员"] --> A["Next.js 16\n页面与 API"]
     A --> S[("SQLite 单文件\n业务数据与文件路径")]
     A --> D[("持久化数据卷\n数据库 / HTML / 静态资源 / WebP")]
     S --- D
@@ -112,7 +108,7 @@ HTML 原型内容**不写入数据库字段**。SQLite 只保存账号、权限�
 
 这种设计避免大文件挤占数据库，也让备份只需覆盖一个数据卷。项目可部署到阿里云、腾讯云、华为云或其他能够运行 Docker 的 Ubuntu 云服务器。
 
-SQLite 数据库文件默认位于 `prototype_data` 数据卷（可用 `DATABASE_FILE` 调整路径），与原型文件、预览图一起持久化。备份与恢复只需对该数据卷做快照或异机加密副本（建议先 `docker compose -f deploy/compose.yml stop app` 再复制文件）。云备份需要在对应云厂商控制台单独开通，本仓库不会自动创建或绑定任何云账号资源。
+SQLite 数据库文件默认位于 `axhub` 数据卷（可用 `DATABASE_FILE` 调整路径），与原型文件、预览图一起持久化。备份与恢复只需对该数据卷做快照或异机加密副本（建议先 `docker compose -f deploy/compose.yml stop app` 再复制文件）。云备份需要在对应云厂商控制台单独开通，本仓库不会自动创建或绑定任何云账号资源。
 
 ## 目录结构
 
@@ -120,7 +116,6 @@ SQLite 数据库文件默认位于 `prototype_data` 数据卷（可用 `DATABASE
 | --- | --- |
 | `src/` | 页面、组件、服务端 API 和核心业务逻辑 |
 | `database/` | SQLite 数据库迁移脚本 |
-| `deploy/` | Dockerfile、Docker Compose 与 Caddy 部署配置 |
 | `config/` | ESLint、Vitest 与 Playwright 工具配置 |
 | `docker/`、`scripts/` | 容器启动、数据库迁移与超级管理员初始化脚本 |
 | `tests/` | Playwright 端到端测试及测试素材 |
@@ -148,24 +143,30 @@ npm run dev
 
 ## Docker 部署
 
-环境要求：Ubuntu 云服务器、Docker Engine、Docker Compose 插件、已解析到服务器的域名。
+环境要求：Ubuntu 云服务器、Docker Engine、Docker Compose 插件。
 
 1. 基于 `.env.example` 创建 `.env`。
 2. 分别生成会话签名密钥、分享密码加密密钥和首位管理员密码。
-3. 修改域名与管理员信息，禁止沿用示例值。
-4. 启动应用与网关（SQLite 数据库文件随数据卷自动创建）：
+3. **构建镜像**：
 
 ```bash
-docker compose -f deploy/compose.yml --profile standalone-proxy up -d --build
+docker build -t axhub:latest .
+# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage -t axhub:latest .
 ```
 
-默认站点前缀为 `/manage`：
+4. **启动服务**（SQLite 数据库文件随数据卷自动创建）：
 
-- 管理端：`https://你的域名/manage`
-- 公开原型：`https://你的域名/manage/project/{code}`
-- 分享原型：`https://你的域名/manage/share/{code}`
+```bash
+docker compose up -d
+```
 
-`NEXT_PUBLIC_BASE_PATH` 在构建时和运行时必须保持一致。详细步骤见 [部署说明](./docs/部署说明.md)、[自动部署说明](./docs/自动部署说明.md) 和 [同域路径接入说明](./docs/同域路径接入说明.md)。
+默认站点前缀为 `/manage`，端口 3000：
+
+- 管理端：`http://服务器IP:3000/manage`
+- 公开原型：`http://服务器IP:3000/manage/project/{code}`
+- 分享原型：`http://服务器IP:3000/manage/share/{code}`
+
+`NEXT_PUBLIC_BASE_PATH` 在构建时和运行时必须保持一致。详细步骤见 [部署说明](./docs/部署说明.md)。
 
 ## 质量检查
 
@@ -184,7 +185,7 @@ GitHub Actions 会在推送和 Pull Request 时自动执行代码规范、类型
 - 不要提交 `.env`、数据库文件、SSH Key、真实域名、客户原型或生产数据。
 - 生产环境必须使用独立随机密码，不要使用 README 中的演示账号密码。
 - 分享密码在数据库中采用加密字段保存，登录密码采用不可逆哈希保存。
-- 建议定期对 `prototype_data` 数据卷做异地加密副本，并在隔离环境验证可恢复。
+- 建议定期对 `axhub` 数据卷做异地加密副本，并在隔离环境验证可恢复。
 - 安全问题请按 [安全说明](./.github/SECURITY.md) 私下报告。
 
 ## 参与贡献

@@ -27,8 +27,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs nextjs \
-    && mkdir -p /data/prototype-hub \
-    && chown -R nextjs:nodejs /data/prototype-hub
+    && mkdir -p /data \
+    && chown -R nextjs:nodejs /data
+
+# Copy production dependencies for standalone scripts (bootstrap, migrate, validate-env)
+COPY --from=dependencies --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
@@ -40,3 +43,6 @@ RUN chmod +x /usr/local/bin/app-entrypoint.sh
 USER nextjs
 EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/app-entrypoint.sh"]
+
+# Build command:
+# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage -t axhub:latest .

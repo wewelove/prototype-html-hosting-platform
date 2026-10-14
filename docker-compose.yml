@@ -1,0 +1,46 @@
+# 构建镜像：docker compose -f deploy/compose.yml -f deploy/compose.build.yml build
+# 部署运行：docker compose -f deploy/compose.yml up -d
+
+name: axhub
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  axhub:
+    init: true
+    image: axhub:latest
+    container_name: axhub
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      TZ: Asia/Shanghai
+      # SQLite 数据库文件与原型文件位于同一数据卷，随卷一起持久化。
+      DATA_DIR: /data
+      DATABASE_FILE: /data/axhub.sqlite3
+      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/manage}
+      SESSION_SIGNING_SECRET: ${SESSION_SIGNING_SECRET}
+      SHARE_PASSWORD_ENCRYPTION_KEY: ${SHARE_PASSWORD_ENCRYPTION_KEY}
+      CHROMIUM_EXECUTABLE_PATH: /usr/bin/chromium
+      STORAGE_RESERVE_RATIO: ${STORAGE_RESERVE_RATIO:-0.2}
+      BOOTSTRAP_SUPER_ADMIN_ACCOUNT: ${BOOTSTRAP_SUPER_ADMIN_ACCOUNT:-admin}
+      BOOTSTRAP_SUPER_ADMIN_PASSWORD: ${BOOTSTRAP_SUPER_ADMIN_PASSWORD}
+      BOOTSTRAP_SUPER_ADMIN_NAME: ${BOOTSTRAP_SUPER_ADMIN_NAME:-系统管理员}
+      BOOTSTRAP_DEPARTMENT_NAME: ${BOOTSTRAP_DEPARTMENT_NAME:-产品中心}
+    ports:
+      - "${APP_HOST_PORT:-3000}:3000"
+    volumes:
+      - axhub:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/manage/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *default-logging
+
+volumes:
+  axhub:
