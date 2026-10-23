@@ -7,7 +7,6 @@ import { getAllowedDepartmentIds } from "@/lib/department-scope";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { removeStoredFile, removeStoredPrototype } from "@/lib/file-storage";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 
 const schema = z.object({
@@ -19,8 +18,6 @@ const schema = z.object({
 });
 
 async function contextFor(request: Request, id: string) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return { error: originError };
   const actor = await getCurrentUser();
   if (!actor || actor.role === "user") {
     return { error: NextResponse.json({ message: "无权操作" }, { status: 403 }) };

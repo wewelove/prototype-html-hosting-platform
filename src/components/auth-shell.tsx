@@ -32,7 +32,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        <p className="auth-brand-foot">原型托管平台demo</p>
+        <p className="auth-brand-foot">原型托管平台</p>
       </aside>
       <main className="auth-main">
         <section className="auth-panel">{children}</section>

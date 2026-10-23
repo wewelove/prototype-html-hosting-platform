@@ -7,7 +7,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
         <PanelsTopLeft size={22} strokeWidth={1.8} aria-hidden="true" />
       </span>
       <span className={compact ? "app-brand-title" : "auth-logo-title"}>
-        原型托管平台demo
+        原型托管平台
       </span>
     </div>
   );

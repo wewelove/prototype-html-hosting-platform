@@ -9,7 +9,7 @@ import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { env, isDemoMode } from "@/lib/env";
 import { getProjectHtml, recordProjectVisit } from "@/lib/project-content";
-import { failureWindowStart, getClientIp, rejectInvalidViewerOrigin } from "@/lib/security";
+import { failureWindowStart, getClientIp } from "@/lib/security";
 import { createShareGrant, shareCookieName, verifyShareGrant } from "@/lib/share-session";
 import { attachVisitorCookie, prototypeHtmlResponse, viewerMessagePage } from "@/lib/viewer-response";
 import { resolveVisitorId, VISITOR_COOKIE } from "@/lib/visitor-session";
@@ -84,8 +84,6 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ code: string }> },
 ) {
-  const originError = rejectInvalidViewerOrigin(request);
-  if (originError) return originError;
   const { code } = await context.params;
   const project = await getProjectByCode(code, "share");
   if (!project || !project.shareEnabled) {

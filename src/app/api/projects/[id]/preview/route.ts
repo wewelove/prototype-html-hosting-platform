@@ -6,7 +6,6 @@ import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { canManageProject, canViewProject } from "@/lib/project-permission";
-import { rejectInvalidOrigin } from "@/lib/security";
 
 export const maxDuration = 60;
 
@@ -30,8 +29,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
   const { id } = await context.params;

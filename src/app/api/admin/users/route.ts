@@ -7,7 +7,6 @@ import { getAllowedDepartmentIds } from "@/lib/department-scope";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { readRequestJson } from "@/lib/request-json";
-import { rejectInvalidOrigin } from "@/lib/security";
 import {
   createTemporaryPassword,
   temporaryPasswordExpiry,
@@ -26,14 +25,10 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
-
   const actor = await getCurrentUser();
   if (!actor || actor.role === "user") {
     return NextResponse.json({ message: "无权操作" }, { status: 403 });
   }
-
   const parsed = schema.safeParse(await readRequestJson(request));
   if (!parsed.success) {
     return NextResponse.json({ message: "人员信息无效，请检查必填项和账号格式" }, { status: 400 });
@@ -41,12 +36,10 @@ export async function POST(request: Request) {
   if (actor.role !== "super_admin" && parsed.data.role !== "user") {
     return NextResponse.json({ message: "普通管理员只能创建普通用户" }, { status: 403 });
   }
-
   const allowedDepartments = await getAllowedDepartmentIds(actor);
   if (!allowedDepartments.has(parsed.data.departmentId)) {
     return NextResponse.json({ message: "目标部门超出管理范围" }, { status: 403 });
   }
-
   const account = parsed.data.account.toLowerCase();
   const department = isDemoMode
     ? demoStore.departments.find((item) => item.id === parsed.data.departmentId)
@@ -54,7 +47,6 @@ export async function POST(request: Request) {
   if (isDemoMode && !department) {
     return NextResponse.json({ message: "部门不存在" }, { status: 400 });
   }
-
   const tempPassword = createTemporaryPassword();
   const expiresAt = temporaryPasswordExpiry();
   const id = crypto.randomUUID();

@@ -6,7 +6,7 @@ import { DEMO_SESSION_COOKIE } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { env, isDemoMode } from "@/lib/env";
-import { failureWindowStart, getClientIp, rejectInvalidOrigin } from "@/lib/security";
+import { failureWindowStart, getClientIp } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
@@ -30,9 +30,6 @@ function safeReturnTo(value?: string) {
 }
 
 export async function POST(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
-
   const parsed = schema.safeParse(await readRequestJson(request));
   if (!parsed.success) {
     return NextResponse.json({ message: parsed.error.issues[0]?.message }, { status: 400 });
@@ -75,7 +72,6 @@ export async function POST(request: Request) {
     });
     return response;
   }
-
   const result = await query<{
     id: string;
     password_hash: string;
@@ -118,7 +114,6 @@ export async function POST(request: Request) {
     const message = tempExpired ? "临时密码已过期，请联系管理员重新生成" : "账号或密码错误";
     return NextResponse.json({ message }, { status: 401 });
   }
-
   const response = NextResponse.json({
     next: user.must_change_password ? withBasePath("/change-password") : safeReturnTo(parsed.data.returnTo),
   });

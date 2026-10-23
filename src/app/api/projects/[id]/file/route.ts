@@ -10,14 +10,11 @@ import { removeStoredFile, removeStoredPrototype, writePrototypeBundle } from "@
 import { readPrototypeUpload } from "@/lib/prototype-upload";
 import { isPrototypeEntryName } from "@/lib/prototype-entry";
 import { canManageProject } from "@/lib/project-permission";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { assertUploadWithinBudget } from "@/lib/storage-budget";
 
 export const maxDuration = 60;
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
   const { id } = await context.params;

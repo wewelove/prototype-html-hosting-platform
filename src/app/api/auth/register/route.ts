@@ -8,7 +8,7 @@ import { verifyCaptchaToken } from "@/lib/captcha";
 import { isUniqueConstraintError, withTransaction } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { env, isDemoMode } from "@/lib/env";
-import { getClientIp, rejectInvalidOrigin } from "@/lib/security";
+import { getClientIp } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 import { DEFAULT_USER_STORAGE_QUOTA_BYTES } from "@/lib/storage-quota";
@@ -29,8 +29,6 @@ const schema = z
   });
 
 export async function POST(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const parsed = schema.safeParse(await readRequestJson(request));
   if (!parsed.success) {
     return NextResponse.json({ message: parsed.error.issues[0]?.message }, { status: 400 });

@@ -5,15 +5,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 
 const createCode = customAlphabet("ABCDEFGHJKLMNPQRSTUVWXYZ23456789", 8);
 const schema = z.object({ expiresInMinutes: z.number().int().min(1).max(1440).default(10) });
 
 export async function POST(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user || user.role !== "super_admin") {
     return NextResponse.json({ message: "仅超级管理员可生成邀请码" }, { status: 403 });

@@ -6,7 +6,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { query } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
@@ -26,8 +25,6 @@ const schema = z
   });
 
 export async function POST(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser({ allowMustChangePassword: true });
   if (!user) return NextResponse.json({ message: "登录状态已失效" }, { status: 401 });
   const parsed = schema.safeParse(await readRequestJson(request));

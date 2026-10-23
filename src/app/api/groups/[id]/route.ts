@@ -5,7 +5,6 @@ import { listGroups } from "@/lib/data";
 import { isUniqueConstraintError, query, type DbValue } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 
 const schema = z.object({
@@ -31,8 +30,6 @@ function descendantIds(groups: Awaited<ReturnType<typeof listGroups>>, rootId: s
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
   const { id } = await context.params;
@@ -98,8 +95,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
   const { id } = await context.params;

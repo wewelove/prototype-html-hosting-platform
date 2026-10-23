@@ -8,7 +8,6 @@ import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { removeStoredPrototype, writePrototypeBundle } from "@/lib/file-storage";
 import { readPrototypeUpload } from "@/lib/prototype-upload";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { assertUploadWithinBudget } from "@/lib/storage-budget";
 import type { PrototypeProject } from "@/lib/types";
 
@@ -20,8 +19,6 @@ function displayName(name: FormDataEntryValue | null, fallback: string) {
 }
 
 export async function POST(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
 

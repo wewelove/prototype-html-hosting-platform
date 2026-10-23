@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { isUniqueConstraintError, query, withTransaction, type DbValue } from "@/lib/db";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 
 const schema = z.object({
@@ -14,8 +13,6 @@ const schema = z.object({
 });
 
 async function authorize(request: Request) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user || user.role !== "super_admin") {
     return NextResponse.json({ message: "无权操作" }, { status: 403 });

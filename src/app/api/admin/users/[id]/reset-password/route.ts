@@ -7,15 +7,12 @@ import { query } from "@/lib/db";
 import { getAllowedDepartmentIds } from "@/lib/department-scope";
 import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createTemporaryPassword, temporaryPasswordExpiry } from "@/lib/temp-password";
 
 const schema = z.object({ password: z.string().min(10).max(64).optional() });
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const actor = await getCurrentUser();
   if (!actor || actor.role === "user") return NextResponse.json({ message: "无权操作" }, { status: 403 });
   const { id } = await context.params;

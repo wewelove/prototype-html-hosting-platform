@@ -8,7 +8,6 @@ import { demoStore } from "@/lib/demo-store";
 import { isDemoMode } from "@/lib/env";
 import { removeStoredFile, removeStoredPrototype } from "@/lib/file-storage";
 import { canManageProject } from "@/lib/project-permission";
-import { rejectInvalidOrigin } from "@/lib/security";
 import { isPrototypeEntryName } from "@/lib/prototype-entry";
 import { readRequestJson } from "@/lib/request-json";
 import { encryptSharePassword } from "@/lib/share-password-crypto";
@@ -24,8 +23,6 @@ const schema = z.object({
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
   const { id } = await context.params;
@@ -134,8 +131,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
-  const originError = rejectInvalidOrigin(request);
-  if (originError) return originError;
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
   const { id } = await context.params;
