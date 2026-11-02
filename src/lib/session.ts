@@ -39,7 +39,7 @@ export function sessionCookieOptions(): Partial<ResponseCookie> {
     domain: env.authCookieDomain || undefined,
     path: "/",
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.cookieSecure,
     sameSite: "lax",
     maxAge: SESSION_MAX_AGE_SECONDS,
     priority: "high",

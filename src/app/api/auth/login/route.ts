@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     response.cookies.set(DEMO_SESSION_COOKIE, user.account, {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: env.cookieSecure,
       domain: env.authCookieDomain || undefined,
       maxAge: 60 * 60 * 12,
       path: "/",

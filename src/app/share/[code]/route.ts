@@ -137,7 +137,7 @@ export async function POST(
   );
   response.cookies.set(shareCookieName(project.id), grant, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.cookieSecure,
     sameSite: "lax",
     path: withBasePath(`/share/${code}`),
     maxAge: 86400,

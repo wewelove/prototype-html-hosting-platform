@@ -32,7 +32,7 @@ export function viewerReturnTo(requestUrl: string, demoUrl: string) {
 export function attachVisitorCookie(response: NextResponse, visitorId: string) {
   response.cookies.set(VISITOR_COOKIE, visitorId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: env.cookieSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 365 * 24 * 60 * 60,

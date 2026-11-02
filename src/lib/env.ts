@@ -19,6 +19,9 @@ export const env = {
     configuredStorageReserveRatio < 1
       ? configuredStorageReserveRatio
       : 0.2,
+  // 容器环境下若通过 HTTP 提供服务，需关闭此项以免 Session Cookie 被浏览器拒绝。
+  // 默认值保持与原逻辑一致：生产环境下启用 Secure（HTTPS）。
+  cookieSecure: process.env.COOKIE_SECURE === "true",
 };
 
 const databaseConfigured = Boolean(process.env.DATABASE_FILE);

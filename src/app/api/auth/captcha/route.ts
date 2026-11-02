@@ -13,7 +13,7 @@ export async function GET() {
   response.cookies.set("prototype_captcha", token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: env.cookieSecure,
     maxAge: 300,
     path: "/",
   });
