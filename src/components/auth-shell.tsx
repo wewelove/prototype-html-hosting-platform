@@ -1,6 +1,7 @@
 import { Brand } from "@/components/brand";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
+
   return (
     <div className="auth-layout">
       <aside className="auth-brand">
