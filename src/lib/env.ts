@@ -4,11 +4,13 @@ import { appBasePath } from "@/lib/app-path";
 const configuredStorageReserveRatio = Number(process.env.STORAGE_RESERVE_RATIO ?? "0.2");
 const dataDir = process.env.DATA_DIR ?? ".data";
 
+const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? `http://localhost:${process.env.APP_HOST_PORT ?? "3000"}`;
+
 export const env = {
   dataDir,
   databaseFile: process.env.DATABASE_FILE ?? path.join(dataDir, "prototype-hub.sqlite3"),
-  manageUrl: `http://localhost:3000${appBasePath}`,
-  demoUrl: `http://localhost:3000${appBasePath}`,
+  manageUrl: `${baseUrl}${appBasePath}`,
+  demoUrl: `${baseUrl}${appBasePath}`,
   authCookieDomain: undefined,
   chromiumExecutablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
   sessionSigningSecret: process.env.SESSION_SIGNING_SECRET,
