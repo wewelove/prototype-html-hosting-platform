@@ -15,9 +15,11 @@ RUN npm run build
 FROM public.ecr.aws/docker/library/node:24-bookworm-slim AS runner
 WORKDIR /app
 ARG NEXT_PUBLIC_BASE_PATH=/manage
+ARG NEXT_PUBLIC_BASE_URL
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH} \
+    NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL} \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     HOME=/tmp
@@ -50,4 +52,7 @@ EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/app-entrypoint.sh"]
 
 # Build command:
-# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage -t axhub:latest .
+# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage --build-arg NEXT_PUBLIC_BASE_URL=http://localhost:3000 -t axhub:latest .
+
+# 部署时建议传入实际地址：
+# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage --build-arg NEXT_PUBLIC_BASE_URL=http://192.168.1.100:3000 -t axhub:latest .
