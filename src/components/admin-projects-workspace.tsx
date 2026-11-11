@@ -74,13 +74,13 @@ export function AdminProjectsWorkspace({
   initialProjects,
   departments,
   categories,
-  demoUrl,
+  viewerUrl,
   canManage,
 }: {
   initialProjects: PrototypeProject[];
   departments: Department[];
   categories: BusinessCategory[];
-  demoUrl: string;
+  viewerUrl: string;
   canManage: boolean;
 }) {
   const router = useRouter();
@@ -251,7 +251,7 @@ export function AdminProjectsWorkspace({
     if (!saved) return;
     if (!shareEnabled) return setMessage("分享已关闭");
     const savedProject = saved as PrototypeProject;
-    if (await copyText(formatShareDetails(savedProject, `${demoUrl}/share/${savedProject.shareCode}/`))) {
+    if (await copyText(formatShareDetails(savedProject, `${viewerUrl}/share/${savedProject.shareCode}/`))) {
       setMessage(savedProject.sharePassword ? "分享链接和密码已自动复制" : "分享链接已自动复制");
     } else {
       setMessage("分享已保存，但浏览器未授权自动复制");
@@ -331,7 +331,7 @@ export function AdminProjectsWorkspace({
 
   async function copyShare(project: PrototypeProject) {
     if (!project.shareEnabled) return;
-    if (await copyText(formatShareDetails(project, `${demoUrl}/share/${project.shareCode}/`))) {
+    if (await copyText(formatShareDetails(project, `${viewerUrl}/share/${project.shareCode}/`))) {
       setMessage(project.sharePassword ? "分享链接和密码已复制" : "分享链接已复制");
     } else {
       setMessage("浏览器未授权复制，请在分享弹窗中查看");
@@ -344,7 +344,7 @@ export function AdminProjectsWorkspace({
       ...active,
       sharePassword: password,
       shareExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
-    }, `${demoUrl}/share/${active.shareCode}/`);
+    }, `${viewerUrl}/share/${active.shareCode}/`);
     if (await copyText(details)) setMessage("分享信息已复制");
     else setError("浏览器未授权复制，请手动选择分享信息");
   }
@@ -433,10 +433,10 @@ export function AdminProjectsWorkspace({
         ) : view === "card" ? (
           <div className="prototype-grid">
             {pagedProjects.map((project, index) => (
-              <article className="prototype-card" key={project.id} role="link" tabIndex={0} aria-label={`打开原型 ${project.name}`} onClick={(event) => { if (!(event.target as HTMLElement).closest("a, button")) window.open(`${demoUrl}/project/${project.publicCode}/`, "_blank", "noopener,noreferrer"); }} onKeyDown={(event) => { if (event.key === "Enter") window.open(`${demoUrl}/project/${project.publicCode}/`, "_blank", "noopener,noreferrer"); }}>
+              <article className="prototype-card" key={project.id} role="link" tabIndex={0} aria-label={`打开原型 ${project.name}`} onClick={(event) => { if (!(event.target as HTMLElement).closest("a, button")) window.open(`${viewerUrl}/project/${project.publicCode}/`, "_blank", "noopener,noreferrer"); }} onKeyDown={(event) => { if (event.key === "Enter") window.open(`${viewerUrl}/project/${project.publicCode}/`, "_blank", "noopener,noreferrer"); }}>
                 <a
                   className="prototype-preview"
-                  href={`${demoUrl}/project/${project.publicCode}/`}
+                  href={`${viewerUrl}/project/${project.publicCode}/`}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -462,7 +462,7 @@ export function AdminProjectsWorkspace({
                 </a>
                 <div className="prototype-card-body">
                   <div className="prototype-title-row">
-                    <a className="prototype-name" href={`${demoUrl}/project/${project.publicCode}/`} target="_blank" rel="noreferrer">{project.name}</a>
+                    <a className="prototype-name" href={`${viewerUrl}/project/${project.publicCode}/`} target="_blank" rel="noreferrer">{project.name}</a>
                     <span className="prototype-title-tags">
                       <span className={`status-tag${project.shareEnabled ? " status-tag-primary" : ""}`}>{project.shareEnabled ? "已共享" : "未共享"}</span>
                       <span className={`status-tag${project.isPublic ? " status-tag-success" : ""}`}>{project.isPublic ? "已公开" : "未公开"}</span>
@@ -532,7 +532,7 @@ export function AdminProjectsWorkspace({
                     <td>
                       <a
                         className="table-link"
-                        href={`${demoUrl}/project/${project.publicCode}/`}
+                        href={`${viewerUrl}/project/${project.publicCode}/`}
                         target="_blank"
                         rel="noreferrer"
                       >
@@ -544,7 +544,7 @@ export function AdminProjectsWorkspace({
                     <td>
                       {project.isPublic ? project.categoryName : "未公开"}
                     </td>
-                    <td>{project.shareEnabled ? (canManage ? <span className="table-share-cell"><a className="table-share-link" href={`${demoUrl}/share/${project.shareCode}/`} target="_blank" rel="noreferrer" title={`${demoUrl}/share/${project.shareCode}/`}><Share2 size={13} /><span>{demoUrl}/share/{project.shareCode}/</span></a><button className="icon-button table-copy-share" type="button" title="复制分享链接和密码" onClick={() => void copyShare(project)}><Copy size={14} /></button></span> : "已开启") : "已关闭"}</td>
+                    <td>{project.shareEnabled ? (canManage ? <span className="table-share-cell"><a className="table-share-link" href={`${viewerUrl}/share/${project.shareCode}/`} target="_blank" rel="noreferrer" title={`${viewerUrl}/share/${project.shareCode}/`}><Share2 size={13} /><span>{viewerUrl}/share/{project.shareCode}/</span></a><button className="icon-button table-copy-share" type="button" title="复制分享链接和密码" onClick={() => void copyShare(project)}><Copy size={14} /></button></span> : "已开启") : "已关闭"}</td>
                     <td>{project.visitCount}</td>
                     <td>{formatDate(project.updatedAt)}</td>
                     {canManage ? <td>
@@ -719,7 +719,7 @@ export function AdminProjectsWorkspace({
                     </label>
                     <div className="form-field">
                       <span className="share-details-heading"><span className="form-label">分享信息</span><button className="icon-button" type="button" title="复制分享信息" aria-label="复制分享信息" onClick={() => void copyCurrentShareDetails()}><Copy size={15} /></button></span>
-                      <pre className="share-details-preview">{formatShareDetails({ ...active, sharePassword: password, shareExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null }, `${demoUrl}/share/${active.shareCode}/`)}</pre>
+                      <pre className="share-details-preview">{formatShareDetails({ ...active, sharePassword: password, shareExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null }, `${viewerUrl}/share/${active.shareCode}/`)}</pre>
                     </div>
                     </> : null}
                   </>

@@ -6,8 +6,7 @@ import { urlUnderBase, withBasePath } from "@/lib/app-path";
 import { decideProjectAccess } from "@/lib/access-policy";
 import { getProjectByCode } from "@/lib/data";
 import { query } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { env, isDemoMode } from "@/lib/env";
+import { env } from "@/lib/env";
 import { getProjectHtml, recordProjectVisit } from "@/lib/project-content";
 import { failureWindowStart, getClientIp } from "@/lib/security";
 import { createShareGrant, shareCookieName, verifyShareGrant } from "@/lib/share-session";
@@ -59,7 +58,6 @@ export async function GET(
 }
 
 async function isRateLimited(projectId: string, ipAddress: string | null) {
-  if (isDemoMode) return false;
   const result = await query<{ failures: number }>(
     `select count(*) as failures
        from share_password_attempts
@@ -73,7 +71,6 @@ async function isRateLimited(projectId: string, ipAddress: string | null) {
 }
 
 async function recordPasswordAttempt(projectId: string, ipAddress: string | null, success: boolean) {
-  if (isDemoMode) return;
   await query(
     "insert into share_password_attempts (project_id, ip_address, success) values ($1, $2, $3)",
     [projectId, ipAddress, success],
@@ -102,17 +99,12 @@ export async function POST(
   }
   const form = await request.formData();
   const password = String(form.get("password") ?? "");
-  let valid = false;
-  if (isDemoMode) {
-    valid = demoStore.sharePasswords.get(project.id) === password;
-  } else {
-    const result = await query<{ share_password_hash: string | null }>(
-      "select share_password_hash from projects where id = $1",
-      [project.id],
-    );
-    const passwordHash = result.rows[0]?.share_password_hash;
-    valid = Boolean(passwordHash && (await compare(password, passwordHash)));
-  }
+  const result = await query<{ share_password_hash: string | null }>(
+    "select share_password_hash from projects where id = $1",
+    [project.id],
+  );
+  const passwordHash = result.rows[0]?.share_password_hash;
+  const valid = Boolean(passwordHash && (await compare(password, passwordHash)));
   await recordPasswordAttempt(project.id, ipAddress, valid);
   if (!valid) {
     return viewerMessagePage({
@@ -132,7 +124,7 @@ export async function POST(
     project.shareExpiresAt,
   );
   const response = NextResponse.redirect(
-    new URL(urlUnderBase(env.demoUrl, `/share/${encodeURIComponent(code)}/`)),
+    new URL(urlUnderBase(env.siteUrl, `/share/${encodeURIComponent(code)}/`)),
     303,
   );
   response.cookies.set(shareCookieName(project.id), grant, {

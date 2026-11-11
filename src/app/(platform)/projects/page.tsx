@@ -17,7 +17,7 @@ export default async function ProjectsPage() {
       initialProjects={projects}
       initialGroups={groups}
       categories={categories}
-      demoUrl={env.demoUrl}
+      viewerUrl={env.siteUrl}
       storageBytes={storageBytes}
       storageLimitBytes={user.storageQuotaBytes}
     />

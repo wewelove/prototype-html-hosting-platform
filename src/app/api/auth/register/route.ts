@@ -3,15 +3,11 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withBasePath } from "@/lib/app-path";
-import { DEMO_SESSION_COOKIE } from "@/lib/auth";
 import { verifyCaptchaToken } from "@/lib/captcha";
 import { isUniqueConstraintError, withTransaction } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { env, isDemoMode } from "@/lib/env";
 import { getClientIp } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
-import { DEFAULT_USER_STORAGE_QUOTA_BYTES } from "@/lib/storage-quota";
 
 const schema = z
   .object({
@@ -45,55 +41,6 @@ export async function POST(request: Request) {
   const input = { ...parsed.data, account: parsed.data.account.toLowerCase() };
   const invitationCode = input.invitationCode.toUpperCase();
   const ipAddress = getClientIp(request);
-  if (isDemoMode) {
-    const invitation = demoStore.invitations.find(
-      (item) => item.code.toUpperCase() === invitationCode,
-    );
-    if (!invitation || invitation.usedAt || new Date(invitation.expiresAt).getTime() <= Date.now()) {
-      return NextResponse.json({ message: "邀请码无效、已使用或已过期" }, { status: 400 });
-    }
-    if (demoStore.users.some((user) => user.account === input.account)) {
-      return NextResponse.json({ message: "该账号已存在" }, { status: 409 });
-    }
-    const department = demoStore.departments.find((item) => item.id === input.departmentId);
-    if (!department) return NextResponse.json({ message: "所选部门不存在" }, { status: 400 });
-    const id = crypto.randomUUID();
-    demoStore.users.push({
-      id,
-      account: input.account,
-      name: input.name,
-      departmentId: department.id,
-      departmentName: department.name,
-      role: "user",
-      status: "active",
-      mustChangePassword: false,
-      tempPasswordExpiresAt: null,
-      storageQuotaBytes: DEFAULT_USER_STORAGE_QUOTA_BYTES,
-      createdAt: new Date().toISOString(),
-    });
-    demoStore.passwords.set(input.account, input.password);
-    invitation.usedAt = new Date().toISOString();
-    invitation.usedByName = input.name;
-    demoStore.loginLogs.unshift({
-      id: crypto.randomUUID(),
-      account: input.account,
-      userName: input.name,
-      success: true,
-      ipAddress,
-      createdAt: new Date().toISOString(),
-    });
-    const response = NextResponse.json({ next: withBasePath("/projects") });
-    response.cookies.set(DEMO_SESSION_COOKIE, input.account, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: env.cookieSecure,
-      domain: env.authCookieDomain || undefined,
-      maxAge: 60 * 60 * 12,
-      path: "/",
-    });
-    response.cookies.set("prototype_captcha", "", { expires: new Date(0), path: "/" });
-    return response;
-  }
 
   try {
     const userId = await withTransaction(async (client) => {

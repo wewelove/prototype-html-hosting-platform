@@ -12,11 +12,6 @@ const nextConfig: NextConfig = {
   skipTrailingSlashRedirect: true,
   output: "standalone",
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "1mb",
-    },
-  },
   outputFileTracingIncludes: {
     "/*": ["./node_modules/node-unrar-js/esm/js/unrar.wasm"],
   },

@@ -3,11 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
-import { DEMO_SESSION_COOKIE } from "@/lib/auth";
-import { urlUnderBase, withBasePath } from "@/lib/app-path";
 import { query, withTransaction } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { env, isDemoMode } from "@/lib/env";
+import { env } from "@/lib/env";
 import { removeStoredFile, storedFileAbsolutePath, writePreviewFile } from "@/lib/file-storage";
 import { isPrototypeEntryName } from "@/lib/prototype-entry";
 import { assetContentType } from "@/lib/viewer-response";
@@ -177,87 +174,13 @@ async function performCapture(projectId: string, htmlPath: string, ownerId: stri
   }
 }
 
-async function performDemoCapture(
-  projectId: string,
-  publicCode: string,
-  account: string,
-  expectedHtmlPath: string,
-) {
-  if (!isDemoMode) return;
-  if (!demoStore.projects.some((item) => item.id === projectId && item.htmlPath === expectedHtmlPath)) return;
-  const executablePath = resolveChromiumExecutable();
-  if (!executablePath) throw new Error("未找到 Chromium/Chrome 可执行文件");
-
-  const targetUrl = new URL(urlUnderBase(env.demoUrl, `/project/${publicCode}/`));
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null;
-  try {
-    browser = await puppeteer.launch({
-      executablePath,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
-      defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 },
-      headless: true,
-    });
-    const page = await browser.newPage();
-    await page.setExtraHTTPHeaders({ "x-prototype-preview-capture": "1" });
-    await page.setCookie({
-      name: DEMO_SESSION_COOKIE,
-      value: account,
-      url: `${targetUrl.origin}/`,
-      httpOnly: true,
-      sameSite: "Lax",
-    });
-    await page.setRequestInterception(true);
-    page.on("request", (request) => {
-      const url = request.url();
-      if (
-        url.startsWith(targetUrl.origin)
-        || url.startsWith("data:")
-        || url.startsWith("blob:")
-        || url === "about:blank"
-      ) {
-        void request.continue();
-      } else {
-        void request.abort();
-      }
-    });
-    await page.goto(targetUrl.href, { waitUntil: "networkidle0", timeout: 20_000 });
-    const image = await page.screenshot({ type: "webp", quality: 68, fullPage: false });
-    const project = demoStore.projects.find((item) => item.id === projectId);
-    if (!project || project.htmlPath !== expectedHtmlPath) return;
-    demoStore.previewFiles.set(projectId, image);
-    project.previewUrl = withBasePath(`/api/mock-preview/${projectId}?v=${Date.now()}`);
-    project.previewSize = image.byteLength;
-    project.previewStatus = "ready";
-    project.previewError = null;
-  } catch (error) {
-    const project = demoStore.projects.find((item) => item.id === projectId);
-    if (project?.htmlPath === expectedHtmlPath) {
-      project.previewStatus = "failed";
-      project.previewError = error instanceof Error ? error.message.slice(0, 500) : "未知错误";
-    } else {
-      return;
-    }
-    throw error;
-  } finally {
-    await browser?.close().catch(() => undefined);
-  }
-}
-
+/**
+ * 原型首页截图串行生成：上传/更新后异步触发，
+ * 同一进程内排队执行，避免并发启动多个 Chromium。
+ */
 export function captureProjectPreview(projectId: string, htmlPath: string, ownerId: string) {
   captureQueue = captureQueue
     .then(() => performCapture(projectId, htmlPath, ownerId))
     .catch((error) => console.error("原型首页截图生成失败", error));
-  return captureQueue;
-}
-
-export function captureDemoProjectPreview(
-  projectId: string,
-  publicCode: string,
-  account: string,
-  expectedHtmlPath: string,
-) {
-  captureQueue = captureQueue
-    .then(() => performDemoCapture(projectId, publicCode, account, expectedHtmlPath))
-    .catch((error) => console.error("演示原型首页截图生成失败", error));
   return captureQueue;
 }

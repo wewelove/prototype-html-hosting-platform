@@ -10,9 +10,6 @@ export default defineConfig([
     "out/**",
     "output/**",
     "build/**",
-    "playwright-report/**",
-    "test-results/**",
-    "high-fidelity-prototype-ant-design/**",
     "next-env.d.ts",
   ]),
 ]);

@@ -13,7 +13,7 @@ describe("viewerReturnTo", () => {
     );
   });
 
-  it("使用配置的演示域名，避免信任请求 Host", () => {
+  it("使用配置的站点域名，避免信任请求 Host", () => {
     const result = viewerReturnTo(
       "https://untrusted.example/project/demo123/",
       "https://prototype-demo.example.com/manage",

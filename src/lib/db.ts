@@ -5,6 +5,7 @@ import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { assertDatabaseConfigured, env } from "@/lib/env";
 
+
 /** 允许传入 SQL 的参数类型；布尔值与 Date 会在绑定前转换成 SQLite 支持的值。 */
 export type DbValue = SQLInputValue | boolean | Date | undefined;
 

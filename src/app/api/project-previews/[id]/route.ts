@@ -1,11 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectById } from "@/lib/data";
-import { isDemoMode } from "@/lib/env";
 import { readStoredFile } from "@/lib/file-storage";
 import { canViewProject } from "@/lib/project-permission";
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
-  if (isDemoMode) return new Response(null, { status: 404 });
   const user = await getCurrentUser();
   if (!user) return new Response(null, { status: 401 });
   const { id } = await context.params;

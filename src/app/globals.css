@@ -406,7 +406,7 @@ button {
   color: var(--primary);
 }
 
-.demo-account {
+.form-notice {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3289,7 +3289,11 @@ button {
   padding: 36px clamp(36px, 5vw, 72px) 32px;
   color: var(--text-strong);
   border-right: 1px solid var(--border);
-  background: #f5f7fa;
+  background-color: #f5f7fa;
+  background-image: url(welcome.png);
+  background-size: 80%;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .auth-brand::after {

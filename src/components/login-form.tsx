@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { withBasePath } from "@/lib/app-path";
 
-export function LoginForm({ demoMode, returnTo }: { demoMode: boolean; returnTo?: string }) {
+export function LoginForm({ returnTo }: { returnTo?: string }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -37,16 +37,10 @@ export function LoginForm({ demoMode, returnTo }: { demoMode: boolean; returnTo?
     <div className="auth-form-wrap">
       <h1 className="auth-form-title">欢迎回来</h1>
       <p className="auth-form-desc">登录后进入原型工作区</p>
-      {demoMode ? (
-        <div className="demo-account">
-          <span>演示账号：admin</span>
-          <span>密码：Prototype@123</span>
-        </div>
-      ) : null}
       <form className="auth-form" onSubmit={submit}>
         <label className="form-field">
           <span className="form-label form-label-required">账号</span>
-          <input className="ui-input" name="account" autoComplete="username" placeholder="请输入账号" defaultValue={demoMode ? "admin" : ""} />
+          <input className="ui-input" name="account" autoComplete="username" placeholder="请输入账号" />
         </label>
         <div className="form-field">
           <label className="form-label form-label-required" htmlFor="login-password">密码</label>
@@ -58,7 +52,6 @@ export function LoginForm({ demoMode, returnTo }: { demoMode: boolean; returnTo?
               type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               placeholder="请输入密码"
-              defaultValue={demoMode ? "Prototype@123" : ""}
             />
             <button
               className="icon-button password-toggle"

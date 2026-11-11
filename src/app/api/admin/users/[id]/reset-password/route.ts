@@ -5,8 +5,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/data";
 import { query } from "@/lib/db";
 import { getAllowedDepartmentIds } from "@/lib/department-scope";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { readRequestJson } from "@/lib/request-json";
 import { createTemporaryPassword, temporaryPasswordExpiry } from "@/lib/temp-password";
 
@@ -25,19 +23,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!parsed.success) return NextResponse.json({ message: "临时密码至少 10 位" }, { status: 400 });
   const tempPassword = parsed.data.password || createTemporaryPassword();
   const expiresAt = temporaryPasswordExpiry();
-  if (isDemoMode) {
-    demoStore.passwords.set(target.account, tempPassword);
-    const storedTarget = demoStore.users.find((item) => item.id === target.id)!;
-    storedTarget.mustChangePassword = true;
-    storedTarget.tempPasswordExpiresAt = expiresAt;
-  } else {
-    await query(
-      `update users set password_hash = $1, must_change_password = true,
-              temp_password_expires_at = $2, session_version = session_version + 1,
-              updated_at = now()
-        where id = $3`,
-      [await hash(tempPassword, 10), expiresAt, id],
-    );
-  }
+  await query(
+    `update users set password_hash = $1, must_change_password = true,
+            temp_password_expires_at = $2, session_version = session_version + 1,
+            updated_at = now()
+      where id = $3`,
+    [await hash(tempPassword, 10), expiresAt, id],
+  );
   return NextResponse.json({ tempPassword, expiresAt });
 }

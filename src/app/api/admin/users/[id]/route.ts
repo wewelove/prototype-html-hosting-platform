@@ -4,8 +4,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { listUsers } from "@/lib/data";
 import { query, withTransaction, type DbValue } from "@/lib/db";
 import { getAllowedDepartmentIds } from "@/lib/department-scope";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { removeStoredFile, removeStoredPrototype } from "@/lib/file-storage";
 import { readRequestJson } from "@/lib/request-json";
 
@@ -17,7 +15,7 @@ const schema = z.object({
   storageQuotaBytes: z.number().int().min(5 * 1024 * 1024).max(1024 * 1024 * 1024 * 1024).optional(),
 });
 
-async function contextFor(request: Request, id: string) {
+async function contextFor(id: string) {
   const actor = await getCurrentUser();
   if (!actor || actor.role === "user") {
     return { error: NextResponse.json({ message: "无权操作" }, { status: 403 }) };
@@ -31,14 +29,6 @@ async function contextFor(request: Request, id: string) {
 }
 
 async function wouldRemoveLastSuperAdmin(id: string, nextRole?: string, deleting = false) {
-  if (isDemoMode) {
-    const target = demoStore.users.find((item) => item.id === id);
-    return Boolean(
-      target?.role === "super_admin" &&
-      (deleting || nextRole && nextRole !== "super_admin") &&
-      demoStore.users.filter((item) => item.role === "super_admin").length <= 1,
-    );
-  }
   const result = await query<{ role: string; count: number }>(
     `select (select role from users where id = $1) as role,
             (select count(*) from users where role = 'super_admin') as count`,
@@ -50,7 +40,7 @@ async function wouldRemoveLastSuperAdmin(id: string, nextRole?: string, deleting
 
 export async function PATCH(request: Request, routeContext: { params: Promise<{ id: string }> }) {
   const { id } = await routeContext.params;
-  const info = await contextFor(request, id);
+  const info = await contextFor(id);
   if (info.error) return info.error;
   const parsed = schema.safeParse(await readRequestJson(request));
   if (!parsed.success) return NextResponse.json({ message: "人员设置无效" }, { status: 400 });
@@ -72,29 +62,6 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
   }
 
   const targetDepartmentId = parsed.data.departmentId ?? info.target!.departmentId;
-  if (isDemoMode) {
-    const target = demoStore.users.find((item) => item.id === id)!;
-    if (parsed.data.name) target.name = parsed.data.name;
-    if (parsed.data.departmentId) {
-      const department = demoStore.departments.find((item) => item.id === parsed.data.departmentId);
-      if (!department) return NextResponse.json({ message: "部门不存在" }, { status: 400 });
-      target.departmentId = department.id;
-      target.departmentName = department.name;
-      demoStore.projects.forEach((project) => {
-        if (project.ownerId === target.id) {
-          project.departmentId = department.id;
-          project.departmentName = department.name;
-        }
-      });
-    }
-    if (parsed.data.role) target.role = parsed.data.role;
-    if (parsed.data.status) target.status = parsed.data.status;
-    if (parsed.data.storageQuotaBytes !== undefined) {
-      target.storageQuotaBytes = parsed.data.storageQuotaBytes;
-    }
-    return NextResponse.json({ ok: true });
-  }
-
   if (parsed.data.departmentId && !(await query("select 1 from departments where id = $1", [parsed.data.departmentId])).rows[0]) {
     return NextResponse.json({ message: "部门不存在" }, { status: 400 });
   }
@@ -123,6 +90,7 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
     }
     values.push(id);
     await client.query(`update users set ${assignments.join(", ")} where id = $${values.length}`, values);
+    // 负责人变更部门时，其原型一并迁移，避免权限范围与数据归属不一致。
     if (parsed.data.departmentId) {
       await client.query(
         "update projects set department_id = $1 where owner_id = $2",
@@ -150,21 +118,13 @@ export async function PATCH(request: Request, routeContext: { params: Promise<{ 
 
 export async function DELETE(request: Request, routeContext: { params: Promise<{ id: string }> }) {
   const { id } = await routeContext.params;
-  const info = await contextFor(request, id);
+  const info = await contextFor(id);
   if (info.error) return info.error;
   if (id === info.actor!.id) {
     return NextResponse.json({ message: "不能删除当前登录账号" }, { status: 400 });
   }
   if (await wouldRemoveLastSuperAdmin(id, undefined, true)) {
     return NextResponse.json({ message: "系统至少需要保留一名超级管理员" }, { status: 400 });
-  }
-  if (isDemoMode) {
-    const projectIds = new Set(demoStore.projects.filter((item) => item.ownerId === id).map((item) => item.id));
-    demoStore.projects = demoStore.projects.filter((item) => item.ownerId !== id);
-    projectIds.forEach((projectId) => demoStore.sharePasswords.delete(projectId));
-    const index = demoStore.users.findIndex((item) => item.id === id);
-    if (index >= 0) demoStore.users.splice(index, 1);
-    return NextResponse.json({ ok: true });
   }
 
   const projects = await withTransaction(async (client) => {

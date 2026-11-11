@@ -4,8 +4,6 @@ import { z } from "zod";
 import { withBasePath } from "@/lib/app-path";
 import { getCurrentUser } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
 
@@ -33,17 +31,6 @@ export async function POST(request: Request) {
   }
   const input = parsed.data;
 
-  if (isDemoMode) {
-    if (demoStore.passwords.get(user.account) !== input.currentPassword) {
-      return NextResponse.json({ message: "当前密码不正确" }, { status: 400 });
-    }
-    demoStore.passwords.set(user.account, input.newPassword);
-    const storedUser = demoStore.users.find((item) => item.id === user.id)!;
-    storedUser.mustChangePassword = false;
-    storedUser.tempPasswordExpiresAt = null;
-    return NextResponse.json({ next: withBasePath("/projects") });
-  }
-
   const current = await query<{ password_hash: string }>(
     "select password_hash from users where id = $1",
     [user.id],
@@ -51,6 +38,7 @@ export async function POST(request: Request) {
   if (!current.rows[0] || !(await compare(input.currentPassword, current.rows[0].password_hash))) {
     return NextResponse.json({ message: "当前密码不正确" }, { status: 400 });
   }
+  // 改密后递增 session_version，使其它已登录设备上的会话立即失效。
   const updated = await query<{ session_version: number }>(
     `update users set password_hash = $1, must_change_password = false,
             temp_password_expires_at = null, session_version = session_version + 1,

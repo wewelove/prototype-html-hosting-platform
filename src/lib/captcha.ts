@@ -6,7 +6,7 @@ function secret() {
   if (process.env.NODE_ENV === "production" && (!env.sessionSigningSecret || env.sessionSigningSecret.length < 32)) {
     throw new Error("生产环境 SESSION_SIGNING_SECRET 至少需要 32 个字符");
   }
-  return new TextEncoder().encode(env.sessionSigningSecret ?? "prototype-local-demo-signing-secret-change-me");
+  return new TextEncoder().encode(env.sessionSigningSecret ?? "prototype-local-dev-signing-secret-change-me");
 }
 
 export function createCaptchaText() {

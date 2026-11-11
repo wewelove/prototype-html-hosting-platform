@@ -50,7 +50,7 @@ export function ChangePasswordForm({ account, forced = false }: { account: strin
   return (
     <form className="auth-form" onSubmit={submit}>
       <input type="hidden" name="username" value={account} autoComplete="username" readOnly />
-      {forced ? <div className="demo-account">当前为临时密码，请修改后继续使用平台</div> : null}
+      {forced ? <div className="form-notice">当前为临时密码，请修改后继续使用平台</div> : null}
       <PasswordField label="当前密码" name="currentPassword" autoComplete="current-password" placeholder="请输入当前密码" />
       <PasswordField label="新密码" name="newPassword" autoComplete="new-password" placeholder="至少8位" />
       <PasswordField label="确认新密码" name="confirmPassword" autoComplete="new-password" placeholder="再次输入新密码" />

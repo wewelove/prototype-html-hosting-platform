@@ -14,7 +14,7 @@ export default async function AdminProjectsPage() {
       initialProjects={projects}
       departments={departments}
       categories={categories}
-      demoUrl={env.demoUrl}
+      viewerUrl={env.siteUrl}
       canManage={actor.role !== "user"}
     />
   );

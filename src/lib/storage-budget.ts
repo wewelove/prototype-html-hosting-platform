@@ -1,8 +1,6 @@
 import { statfs } from "node:fs/promises";
 import { query, type DbClient, type DbValue } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { env, isDemoMode } from "@/lib/env";
-import { DEFAULT_USER_STORAGE_QUOTA_BYTES } from "@/lib/storage-quota";
+import { env } from "@/lib/env";
 
 const DEFAULT_STORAGE_RESERVE_RATIO = 0.2;
 
@@ -27,7 +25,7 @@ export function calculatePlatformStorageBudget(
   const reserveBytes = Math.floor(diskTotalBytes * reserveRatio);
   const uploadAvailableBytes = Math.max(0, diskAvailableBytes - reserveBytes);
   const diskUsedBytes = Math.max(0, diskTotalBytes - diskAvailableBytes);
-  // SQLite 数据库文件、系统与其它占用统一归入剩余部分，不再单独统计备份仓库。
+  // SQLite 数据库文件、系统与其它占用统一归入剩余部分。
   const systemAndOtherUsedBytes = Math.max(0, diskUsedBytes - prototypeUsedBytes);
   return {
     prototypeUsedBytes,
@@ -50,11 +48,6 @@ async function queryTotal(client: DbClient | undefined, sql: string, values: DbV
 }
 
 export async function getStorageUsageBytes(ownerId?: string, client?: DbClient) {
-  if (isDemoMode) {
-    return demoStore.projects
-      .filter((project) => !ownerId || project.ownerId === ownerId)
-      .reduce((total, project) => total + project.fileSize + project.previewSize, 0);
-  }
   // SQLite 不支持数组参数，按是否限定负责人使用两条固定 SQL。
   return ownerId
     ? queryTotal(
@@ -98,10 +91,6 @@ export async function getPlatformStorageBudget(
 }
 
 async function getUserQuotaBytes(ownerId: string, client?: DbClient) {
-  if (isDemoMode) {
-    return demoStore.users.find((user) => user.id === ownerId)?.storageQuotaBytes
-      ?? DEFAULT_USER_STORAGE_QUOTA_BYTES;
-  }
   const sql = "select storage_quota_bytes from users where id = $1";
   const result = client
     ? await client.query<{ storage_quota_bytes: number }>(sql, [ownerId])

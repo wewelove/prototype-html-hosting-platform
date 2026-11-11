@@ -16,10 +16,10 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-export function PublicSquare({ projects, categories, demoUrl }: {
+export function PublicSquare({ projects, categories, viewerUrl }: {
   projects: PrototypeProject[];
   categories: BusinessCategory[];
-  demoUrl: string;
+  viewerUrl: string;
 }) {
   const router = useRouter();
   const [category, setCategory] = useState<string>("all");
@@ -56,7 +56,7 @@ export function PublicSquare({ projects, categories, demoUrl }: {
       <div className="square-toolbar"><span>共 {visible.length} 个公开原型</span><span className="sort-segment"><button className={sort === "updated" ? "is-active" : ""} type="button" onClick={() => { setSort("updated"); setPage(1); }}><CalendarClock size={14} />最近更新</button><button className={sort === "visits" ? "is-active" : ""} type="button" onClick={() => { setSort("visits"); setPage(1); }}><Eye size={14} />访问最多</button></span></div>
       <div className="square-results">
       {visible.length ? <div className="prototype-grid square-grid">{pagedProjects.map((project, index) => (
-        <a className="prototype-card square-card" href={`${demoUrl}/project/${project.publicCode}/`} target="_blank" rel="noreferrer" key={project.id}>
+        <a className="prototype-card square-card" href={`${viewerUrl}/project/${project.publicCode}/`} target="_blank" rel="noreferrer" key={project.id}>
           <span className="prototype-preview">
             {project.previewUrl ? <Image src={project.previewUrl} alt={`${project.name}首页预览`} fill sizes="(max-width:900px) 100vw, 360px" loading={index < 12 ? "eager" : "lazy"} unoptimized /> : <span className={`preview-loading${project.previewStatus === "failed" ? " is-failed" : ""}`}><LoaderCircle size={28} />{project.previewStatus === "failed" ? "预览图生成失败" : "预览图生成中"}</span>}
             <i><Eye size={14} />{project.visitCount}</i>

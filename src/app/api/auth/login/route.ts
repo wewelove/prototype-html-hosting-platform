@@ -2,10 +2,8 @@ import { compare } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withBasePath } from "@/lib/app-path";
-import { DEMO_SESSION_COOKIE } from "@/lib/auth";
 import { query } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { env, isDemoMode } from "@/lib/env";
+import { env } from "@/lib/env";
 import { failureWindowStart, getClientIp } from "@/lib/security";
 import { readRequestJson } from "@/lib/request-json";
 import { createSessionToken, SESSION_COOKIE, sessionCookieOptions } from "@/lib/session";
@@ -21,8 +19,7 @@ function safeReturnTo(value?: string) {
   if (value.startsWith("/") && !value.startsWith("//")) return withBasePath(value);
   try {
     const url = new URL(value);
-    const allowedOrigins = [env.demoUrl, env.manageUrl].map((item) => new URL(item).origin);
-    if (allowedOrigins.includes(url.origin)) return value;
+    if (url.origin === new URL(env.siteUrl).origin) return value;
   } catch {
     return withBasePath("/projects");
   }
@@ -37,41 +34,6 @@ export async function POST(request: Request) {
   const account = parsed.data.account.toLowerCase();
   const ipAddress = getClientIp(request);
 
-  if (isDemoMode) {
-    const recentFailures = demoStore.loginLogs.filter((item) =>
-      item.account === account
-      && item.ipAddress === ipAddress
-      && !item.success
-      && new Date(item.createdAt).getTime() > Date.now() - 15 * 60_000,
-    ).length;
-    if (recentFailures >= 10) {
-      return NextResponse.json({ message: "登录失败次数过多，请 15 分钟后再试" }, { status: 429 });
-    }
-    const user = demoStore.users.find((item) => item.account === account);
-    const valid = user && demoStore.passwords.get(account) === parsed.data.password && user.status === "active";
-    demoStore.loginLogs.unshift({
-      id: crypto.randomUUID(),
-      account,
-      userName: user?.name ?? null,
-      success: Boolean(valid),
-      ipAddress,
-      createdAt: new Date().toISOString(),
-    });
-    if (!valid) return NextResponse.json({ message: "账号或密码错误" }, { status: 401 });
-
-    const response = NextResponse.json({
-      next: user.mustChangePassword ? withBasePath("/change-password") : safeReturnTo(parsed.data.returnTo),
-    });
-    response.cookies.set(DEMO_SESSION_COOKIE, user.account, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: env.cookieSecure,
-      domain: env.authCookieDomain || undefined,
-      maxAge: 60 * 60 * 12,
-      path: "/",
-    });
-    return response;
-  }
   const result = await query<{
     id: string;
     password_hash: string;

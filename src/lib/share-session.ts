@@ -5,7 +5,7 @@ function key() {
   if (process.env.NODE_ENV === "production" && !env.sessionSigningSecret) {
     throw new Error("生产环境缺少 SESSION_SIGNING_SECRET");
   }
-  return new TextEncoder().encode(env.sessionSigningSecret || "local-demo-share-secret");
+  return new TextEncoder().encode(env.sessionSigningSecret || "local-dev-share-secret");
 }
 
 export function shareCookieName(projectId: string) {

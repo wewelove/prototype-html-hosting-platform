@@ -3,8 +3,6 @@
 
 # next.js
 /.next/
-/.next-e2e/
-/.next-basepath-smoke*/
 /out/
 /.data/
 
@@ -27,11 +25,6 @@ yarn-error.log*
 
 # test output
 /coverage
-/test-results/
-/playwright-report/
-/.next-cli/
-/.playwright-cli/
-/output/
 
 # typescript
 *.tsbuildinfo

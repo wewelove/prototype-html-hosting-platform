@@ -4,11 +4,8 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { getProjectById } from "@/lib/data";
 import { query, type DbValue } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { removeStoredFile, removeStoredPrototype } from "@/lib/file-storage";
 import { canManageProject } from "@/lib/project-permission";
-import { isPrototypeEntryName } from "@/lib/prototype-entry";
 import { readRequestJson } from "@/lib/request-json";
 import { encryptSharePassword } from "@/lib/share-password-crypto";
 
@@ -37,69 +34,27 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const input = parsed.data;
 
   if (input.groupId) {
-    const validGroup = isDemoMode
-      ? demoStore.groups.some((group) => group.id === input.groupId && group.ownerId === project.ownerId)
-      : Boolean(
-          (await query("select 1 from prototype_groups where id = $1 and owner_id = $2", [input.groupId, project.ownerId])).rows[0],
-        );
+    const validGroup = Boolean(
+      (await query("select 1 from prototype_groups where id = $1 and owner_id = $2", [input.groupId, project.ownerId])).rows[0],
+    );
     if (!validGroup) {
       return NextResponse.json({ message: "所选分组不属于原型负责人" }, { status: 400 });
     }
   }
 
-  let categoryName = project.categoryName;
   if (input.isPublic === true) {
     const categoryId = input.categoryId ?? project.categoryId;
-    if (isDemoMode) {
-      const category = demoStore.categories.find((item) => item.id === categoryId && item.enabled);
-      if (!category) {
-        return NextResponse.json({ message: "公开原型前必须选择业务分类" }, { status: 400 });
-      }
-      categoryName = category.name;
-    } else {
-      const category = await query<{ name: string }>(
-        "select name from business_categories where id = $1 and enabled = true",
-        [categoryId],
-      );
-      if (!category.rows[0]) {
-        return NextResponse.json({ message: "公开原型前必须选择业务分类" }, { status: 400 });
-      }
-      categoryName = category.rows[0].name;
+    const category = await query(
+      "select 1 from business_categories where id = $1 and enabled = true",
+      [categoryId],
+    );
+    if (!category.rows[0]) {
+      return NextResponse.json({ message: "公开原型前必须选择业务分类" }, { status: 400 });
     }
   }
 
   if (input.shareExpiresAt && new Date(input.shareExpiresAt).getTime() <= Date.now()) {
     return NextResponse.json({ message: "分享截止时间必须晚于当前时间" }, { status: 400 });
-  }
-
-  if (isDemoMode) {
-    const storedProject = demoStore.projects.find((item) => item.id === project.id)!;
-    if (input.name !== undefined) storedProject.name = input.name;
-    if (input.groupId !== undefined) storedProject.groupId = input.groupId;
-    if (input.categoryId !== undefined) storedProject.categoryId = input.categoryId;
-    if (input.isPublic !== undefined) storedProject.isPublic = input.isPublic;
-    if (input.shareEnabled !== undefined) storedProject.shareEnabled = input.shareEnabled;
-    if (input.shareExpiresAt !== undefined) storedProject.shareExpiresAt = input.shareExpiresAt;
-    if (input.sharePassword !== undefined) {
-      if (input.sharePassword) demoStore.sharePasswords.set(project.id, input.sharePassword);
-      else demoStore.sharePasswords.delete(project.id);
-      storedProject.shareHasPassword = Boolean(input.sharePassword);
-    }
-    if (
-      input.shareEnabled !== undefined
-      || input.shareExpiresAt !== undefined
-      || input.sharePassword !== undefined
-    ) {
-      storedProject.shareVersion = (storedProject.shareVersion ?? 1) + 1;
-    }
-    storedProject.categoryName = input.categoryId === null ? null : categoryName;
-    storedProject.updatedAt = new Date().toISOString();
-    return NextResponse.json({
-      project: {
-        ...storedProject,
-        sharePassword: demoStore.sharePasswords.get(storedProject.id) ?? null,
-      },
-    });
   }
 
   const values: DbValue[] = [];
@@ -137,19 +92,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   const project = await getProjectById(id);
   if (!project || !(await canManageProject(user, project))) {
     return NextResponse.json({ message: "原型不存在或无权操作" }, { status: 404 });
-  }
-
-  if (isDemoMode) {
-    const index = demoStore.projects.findIndex((item) => item.id === project.id);
-    if (index >= 0) demoStore.projects.splice(index, 1);
-    const bundled = isPrototypeEntryName(project.htmlPath);
-    const root = bundled ? project.htmlPath.replace(/\/[^/]+$/, "") : project.htmlPath;
-    [...demoStore.htmlFiles.keys()].forEach((key) => {
-      if (key === project.htmlPath || (bundled && key.startsWith(`${root}/`))) demoStore.htmlFiles.delete(key);
-    });
-    demoStore.sharePasswords.delete(project.id);
-    demoStore.previewFiles.delete(project.id);
-    return NextResponse.json({ ok: true });
   }
 
   const deleted = await query<{ html_path: string; preview_path: string | null }>(

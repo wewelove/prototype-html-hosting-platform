@@ -13,17 +13,17 @@ export function escapeHtml(value: string) {
 }
 
 export function redirectToLogin(requestUrl: string) {
-  const login = new URL(urlUnderBase(env.manageUrl, "/login"));
-  const returnTo = viewerReturnTo(requestUrl, env.demoUrl);
+  const login = new URL(urlUnderBase(env.siteUrl, "/login"));
+  const returnTo = viewerReturnTo(requestUrl, env.siteUrl);
   login.searchParams.set("returnTo", returnTo.toString());
   return NextResponse.redirect(login);
 }
 
-export function viewerReturnTo(requestUrl: string, demoUrl: string) {
+export function viewerReturnTo(requestUrl: string, siteUrl: string) {
   const requested = new URL(requestUrl);
-  const returnTo = new URL(demoUrl);
-  const demoBasePath = normalizeBasePath(returnTo.pathname);
-  returnTo.pathname = prefixWithBasePath(requested.pathname, demoBasePath);
+  const returnTo = new URL(siteUrl);
+  const siteBasePath = normalizeBasePath(returnTo.pathname);
+  returnTo.pathname = prefixWithBasePath(requested.pathname, siteBasePath);
   returnTo.search = requested.search;
   returnTo.hash = "";
   return returnTo;
@@ -115,7 +115,7 @@ export function viewerMessagePage(input: {
   const error = input.error ? `<div class="error">${escapeHtml(input.error)}</div>` : "";
   const form = input.passwordForm
     ? `<form method="post"><label for="share-password">访问密码</label><div class="row"><input id="share-password" name="password" type="password" autofocus required maxlength="64" placeholder="请输入分享密码"><button type="submit">访问原型</button></div></form>`
-    : `<a href="${escapeHtml(urlUnderBase(env.manageUrl, "/projects"))}">返回原型中心</a>`;
+    : `<a href="${escapeHtml(urlUnderBase(env.siteUrl, "/projects"))}">返回原型中心</a>`;
   const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(input.title)}</title><style>*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;color:#223355;background:#f5f7fa;font:14px "Microsoft YaHei",sans-serif}.box{width:min(460px,100%);padding:32px;border:1px solid #dde1eb;border-radius:8px;background:#fff}.mark{width:44px;height:44px;display:grid;place-items:center;margin-bottom:24px;color:#fff;border-radius:8px;background:#3388ff;font-weight:700}h1{margin:0 0 10px;color:#081126;font-size:22px}p{margin:0 0 24px;color:#6b7a99;line-height:1.7}label{display:block;margin-bottom:8px}.row{display:grid;grid-template-columns:1fr auto;gap:8px}input{height:40px;padding:0 10px;border:1px solid #dde1eb;border-radius:4px;outline:none}input:focus{border-color:#3388ff;box-shadow:0 0 0 2px #d6edff}button,a{height:40px;display:inline-flex;align-items:center;justify-content:center;padding:0 18px;color:#fff;border:0;border-radius:4px;background:#3388ff;text-decoration:none;cursor:pointer}.error{margin-bottom:12px;color:#ff4433}</style></head><body><main class="box"><div class="mark">E</div><h1>${escapeHtml(input.title)}</h1><p>${escapeHtml(input.message)}</p>${error}${form}</main></body></html>`;
   return new NextResponse(html, {
     status: input.code ?? 200,

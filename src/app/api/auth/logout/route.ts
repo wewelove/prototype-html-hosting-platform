@@ -1,20 +1,17 @@
 import { NextResponse } from "next/server";
 import { withBasePath } from "@/lib/app-path";
-import { DEMO_SESSION_COOKIE } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { SESSION_COOKIE } from "@/lib/session";
 
-export async function POST(request: Request) {
+export async function POST() {
   const response = NextResponse.json({ next: withBasePath("/login") });
-  const expired = {
+  response.cookies.set(SESSION_COOKIE, "", {
     expires: new Date(0),
     domain: env.authCookieDomain || undefined,
     path: "/",
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: "lax",
     secure: env.cookieSecure,
-  };
-  response.cookies.set(SESSION_COOKIE, "", expired);
-  response.cookies.set(DEMO_SESSION_COOKIE, "", expired);
+  });
   return response;
 }

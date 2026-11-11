@@ -6,6 +6,7 @@ RUN npm ci
 FROM dependencies AS builder
 WORKDIR /app
 COPY . .
+# 路由前缀必须在这里通过构建参数确定，运行期无法修改。
 ARG NEXT_PUBLIC_BASE_PATH=/manage
 ENV NEXT_TELEMETRY_DISABLED=1 \
     NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
@@ -14,12 +15,8 @@ RUN npm run build
 # node:sqlite 内置于 Node 24，无需额外安装原生数据库驱动。
 FROM public.ecr.aws/docker/library/node:24-bookworm-slim AS runner
 WORKDIR /app
-ARG NEXT_PUBLIC_BASE_PATH=/manage
-ARG NEXT_PUBLIC_BASE_URL
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH} \
-    NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL} \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     HOME=/tmp
@@ -51,8 +48,8 @@ USER nextjs
 EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/app-entrypoint.sh"]
 
-# Build command:
-# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage --build-arg NEXT_PUBLIC_BASE_URL=http://localhost:3000 -t axhub:latest .
-
-# 部署时建议传入实际地址：
-# docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage --build-arg NEXT_PUBLIC_BASE_URL=http://192.168.1.100:3000 -t axhub:latest .
+# 内网构建与启动：
+#   docker build -t axhub:latest .
+#   docker compose up -d
+# basePath 由构建参数决定（运行期无效），如需更改路由前缀必须重建镜像：
+#   docker build --build-arg NEXT_PUBLIC_BASE_PATH=/manage -t axhub:latest .

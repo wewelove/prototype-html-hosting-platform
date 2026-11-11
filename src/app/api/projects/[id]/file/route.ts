@@ -1,19 +1,16 @@
 import { after, NextResponse } from "next/server";
-import path from "node:path";
 import { getCurrentUser } from "@/lib/auth";
-import { captureDemoProjectPreview, captureProjectPreview } from "@/lib/capture-preview";
+import { captureProjectPreview } from "@/lib/capture-preview";
 import { getProjectById } from "@/lib/data";
 import { withTransaction } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { removeStoredFile, removeStoredPrototype, writePrototypeBundle } from "@/lib/file-storage";
 import { readPrototypeUpload } from "@/lib/prototype-upload";
-import { isPrototypeEntryName } from "@/lib/prototype-entry";
 import { canManageProject } from "@/lib/project-permission";
 import { assertUploadWithinBudget } from "@/lib/storage-budget";
 
 export const maxDuration = 60;
 
+/** 替换原型文件：旧的 HTML、预览图在事务提交后清理，入口链接保持不变。 */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "请先登录" }, { status: 401 });
@@ -40,41 +37,6 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const requestedName = typeof nameInput === "string" && nameInput.trim()
       ? nameInput.trim().slice(0, 80)
       : null;
-    let name = requestedName ?? project.name;
-    if (isDemoMode) {
-      const storedProject = demoStore.projects.find((item) => item.id === project.id)!;
-      await assertUploadWithinBudget(
-        project.ownerId,
-        upload.totalSize,
-        project.fileSize + project.previewSize,
-      );
-      const root = path.posix.join("demo", project.ownerId, `${project.id}-${Date.now()}`);
-      newPath = path.posix.join(root, upload.entryPath);
-      upload.assets.forEach((asset) => demoStore.htmlFiles.set(path.posix.join(root, asset.path), asset.content));
-      const bundled = isPrototypeEntryName(project.htmlPath);
-      const oldRoot = bundled ? path.posix.dirname(project.htmlPath) : project.htmlPath;
-      [...demoStore.htmlFiles.keys()].forEach((key) => {
-        if (key === project.htmlPath || (bundled && key.startsWith(`${oldRoot}/`))) demoStore.htmlFiles.delete(key);
-      });
-      storedProject.htmlPath = newPath;
-      storedProject.fileSize = upload.totalSize;
-      storedProject.sourceKind = upload.sourceKind;
-      storedProject.sourceName = upload.sourceName;
-      storedProject.name = name;
-      demoStore.previewFiles.delete(project.id);
-      storedProject.previewUrl = null;
-      storedProject.previewSize = 0;
-      storedProject.previewStatus = "pending";
-      storedProject.previewError = null;
-      storedProject.updatedAt = new Date().toISOString();
-      after(() => captureDemoProjectPreview(project.id, storedProject.publicCode, user.account, newPath!));
-      return NextResponse.json({
-        project: {
-          ...storedProject,
-          sharePassword: demoStore.sharePasswords.get(storedProject.id) ?? null,
-        },
-      });
-    }
 
     let previousHtmlPath = project.htmlPath;
     let previousPreviewPath = project.previewPath;
@@ -93,7 +55,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       if (!current.rows[0]) throw new Error("PROJECT_NOT_FOUND");
       previousHtmlPath = current.rows[0].html_path;
       previousPreviewPath = current.rows[0].preview_path;
-      name = requestedName ?? current.rows[0].name;
+      const name = requestedName ?? current.rows[0].name;
       await assertUploadWithinBudget(
         project.ownerId,
         upload.totalSize,
@@ -121,7 +83,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     after(() => captureProjectPreview(project.id, newPath!, project.ownerId));
     return NextResponse.json({ project: await getProjectById(project.id) });
   } catch (error) {
-    if (!isDemoMode && newPath) await removeStoredPrototype(newPath).catch(() => undefined);
+    if (newPath) await removeStoredPrototype(newPath).catch(() => undefined);
     if (error instanceof Error && error.message === "PROJECT_NOT_FOUND") {
       return NextResponse.json({ message: "原型不存在或已被删除" }, { status: 404 });
     }

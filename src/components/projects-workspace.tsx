@@ -87,14 +87,14 @@ export function ProjectsWorkspace({
   initialProjects,
   initialGroups,
   categories,
-  demoUrl,
+  viewerUrl,
   storageBytes,
   storageLimitBytes,
 }: {
   initialProjects: PrototypeProject[];
   initialGroups: PrototypeGroup[];
   categories: BusinessCategory[];
-  demoUrl: string;
+  viewerUrl: string;
   storageBytes: number;
   storageLimitBytes: number;
 }) {
@@ -432,8 +432,8 @@ export function ProjectsWorkspace({
     }
   }
 
-  const projectUrl = (project: PrototypeProject) => `${demoUrl}/project/${project.publicCode}/`;
-  const shareUrl = (project: PrototypeProject) => `${demoUrl}/share/${project.shareCode}/`;
+  const projectUrl = (project: PrototypeProject) => `${viewerUrl}/project/${project.publicCode}/`;
+  const shareUrl = (project: PrototypeProject) => `${viewerUrl}/share/${project.shareCode}/`;
   const downloadUrl = (project: PrototypeProject) => withBasePath(`/api/projects/${project.id}/download`);
   const usagePercent = Math.min(100, (storageBytes / storageLimitBytes) * 100);
 

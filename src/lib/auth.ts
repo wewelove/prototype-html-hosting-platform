@@ -1,13 +1,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { query } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 import type { UserProfile } from "@/lib/types";
 import { DEFAULT_USER_STORAGE_QUOTA_BYTES } from "@/lib/storage-quota";
-
-export const DEMO_SESSION_COOKIE = "prototype_demo_session";
 
 function mapProfile(row: Record<string, unknown>): UserProfile {
   return {
@@ -15,7 +11,7 @@ function mapProfile(row: Record<string, unknown>): UserProfile {
     account: String(row.account),
     name: String(row.name),
     departmentId: String(row.department_id),
-    departmentName: String(row.department_name ?? "未分配部门"),
+    departmentName: row.department_name ? String(row.department_name) : "未分配部门",
     role: row.role as UserProfile["role"],
     status: row.status as UserProfile["status"],
     mustChangePassword: Boolean(row.must_change_password),
@@ -28,13 +24,6 @@ function mapProfile(row: Record<string, unknown>): UserProfile {
 }
 
 export async function getCurrentUser(options: { allowMustChangePassword?: boolean } = {}): Promise<UserProfile | null> {
-  if (isDemoMode) {
-    const account = (await cookies()).get(DEMO_SESSION_COOKIE)?.value;
-    const user = demoStore.users.find((item) => item.account === account && item.status === "active") ?? null;
-    if (user?.mustChangePassword && !options.allowMustChangePassword) return null;
-    return user;
-  }
-
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const session = await verifySessionToken(token);

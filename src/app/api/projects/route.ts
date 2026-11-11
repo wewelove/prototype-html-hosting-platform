@@ -1,11 +1,8 @@
 import { after, NextResponse } from "next/server";
-import path from "node:path";
 import { nanoid } from "nanoid";
 import { getCurrentUser } from "@/lib/auth";
-import { captureDemoProjectPreview, captureProjectPreview } from "@/lib/capture-preview";
+import { captureProjectPreview } from "@/lib/capture-preview";
 import { query, withTransaction } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { removeStoredPrototype, writePrototypeBundle } from "@/lib/file-storage";
 import { readPrototypeUpload } from "@/lib/prototype-upload";
 import { assertUploadWithinBudget } from "@/lib/storage-budget";
@@ -41,11 +38,9 @@ export async function POST(request: Request) {
     const upload = await readPrototypeUpload(form);
 
     if (groupId) {
-      const ownsGroup = isDemoMode
-        ? demoStore.groups.some((group) => group.id === groupId && group.ownerId === user.id)
-        : Boolean(
-            (await query("select 1 from prototype_groups where id = $1 and owner_id = $2", [groupId, user.id])).rows[0],
-          );
+      const ownsGroup = Boolean(
+        (await query("select 1 from prototype_groups where id = $1 and owner_id = $2", [groupId, user.id])).rows[0],
+      );
       if (!ownsGroup) throw new Error("所选分组不存在");
     }
 
@@ -54,40 +49,35 @@ export async function POST(request: Request) {
     const publicCode = nanoid(8);
     const shareCode = nanoid(8);
     const name = displayName(form.get("name"), upload.suggestedName);
-    if (isDemoMode) {
-      await assertUploadWithinBudget(user.id, upload.totalSize);
-      const root = path.posix.join("demo", user.id, `${id}-${nanoid(8)}`);
-      htmlPath = path.posix.join(root, upload.entryPath);
-      upload.assets.forEach((asset) => demoStore.htmlFiles.set(path.posix.join(root, asset.path), asset.content));
-    } else {
-      await withTransaction(async (client) => {
-        await assertUploadWithinBudget(user.id, upload.totalSize, 0, client);
-        htmlPath = await writePrototypeBundle(user.id, id, upload.assets, upload.entryPath);
-        await client.query(
-          `insert into projects
-            (id, public_code, share_code, name, owner_id, department_id, group_id,
-             html_path, file_size, source_kind, source_name)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [
-            id,
-            publicCode,
-            shareCode,
-            name,
-            user.id,
-            user.departmentId,
-            groupId,
-            htmlPath,
-            upload.totalSize,
-            upload.sourceKind,
-            upload.sourceName,
-          ],
-        );
-        await client.query(
-          "insert into platform_events (event_type, project_id, user_id) values ('upload', $1, $2)",
-          [id, user.id],
-        );
-      });
-    }
+
+    await withTransaction(async (client) => {
+      await assertUploadWithinBudget(user.id, upload.totalSize, 0, client);
+      htmlPath = await writePrototypeBundle(user.id, id, upload.assets, upload.entryPath);
+      await client.query(
+        `insert into projects
+          (id, public_code, share_code, name, owner_id, department_id, group_id,
+           html_path, file_size, source_kind, source_name)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [
+          id,
+          publicCode,
+          shareCode,
+          name,
+          user.id,
+          user.departmentId,
+          groupId,
+          htmlPath,
+          upload.totalSize,
+          upload.sourceKind,
+          upload.sourceName,
+        ],
+      );
+      await client.query(
+        "insert into platform_events (event_type, project_id, user_id) values ('upload', $1, $2)",
+        [id, user.id],
+      );
+    });
+
     const project: PrototypeProject = {
       id,
       publicCode,
@@ -119,15 +109,10 @@ export async function POST(request: Request) {
       updatedAt: now,
     };
 
-    if (isDemoMode) {
-      demoStore.projects.unshift(project);
-      after(() => captureDemoProjectPreview(id, publicCode, user.account, htmlPath!));
-    } else {
-      after(() => captureProjectPreview(id, htmlPath!, user.id));
-    }
+    after(() => captureProjectPreview(id, htmlPath!, user.id));
     return NextResponse.json({ project });
   } catch (error) {
-    if (!isDemoMode && htmlPath) await removeStoredPrototype(htmlPath).catch(() => undefined);
+    if (htmlPath) await removeStoredPrototype(htmlPath).catch(() => undefined);
     return NextResponse.json(
       { message: error instanceof Error ? error.message : "原型创建失败" },
       { status: 400 },

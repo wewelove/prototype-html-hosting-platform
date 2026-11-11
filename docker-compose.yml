@@ -1,5 +1,6 @@
-# 构建镜像：docker compose -f deploy/compose.yml -f deploy/compose.build.yml build
-# 部署运行：docker compose -f deploy/compose.yml up -d
+# 内网单机部署：先构建镜像，再启动容器。
+#   docker build -t axhub:latest .
+#   docker compose up -d
 
 name: axhub
 
@@ -21,7 +22,11 @@ services:
       # SQLite 数据库文件与原型文件位于同一数据卷，随卷一起持久化。
       DATA_DIR: /data
       DATABASE_FILE: /data/axhub.sqlite3
+      # 仅用于健康检查拼接路径，必须与镜像构建参数 --build-arg NEXT_PUBLIC_BASE_PATH 一致。
+      # 应用路由前缀在构建期固定，容器内设置该变量不会改变应用行为。
       NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-/manage}
+      # 运行期读取：用于生成分享与查看链接，更换内网地址时修改即可，无需重建镜像。
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL}
       SESSION_SIGNING_SECRET: ${SESSION_SIGNING_SECRET}
       SHARE_PASSWORD_ENCRYPTION_KEY: ${SHARE_PASSWORD_ENCRYPTION_KEY}
       CHROMIUM_EXECUTABLE_PATH: /usr/bin/chromium
@@ -36,7 +41,7 @@ services:
     volumes:
       - axhub:/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/manage/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000${NEXT_PUBLIC_BASE_PATH:-/manage}/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))\""]
       interval: 15s
       timeout: 5s
       retries: 10

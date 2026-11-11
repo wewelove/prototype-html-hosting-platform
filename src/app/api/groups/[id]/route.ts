@@ -3,8 +3,6 @@ import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { listGroups } from "@/lib/data";
 import { isUniqueConstraintError, query, type DbValue } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { readRequestJson } from "@/lib/request-json";
 
 const schema = z.object({
@@ -61,29 +59,24 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   try {
-    if (isDemoMode) {
-      if (input.name !== undefined) group.name = input.name;
-      if (input.parentId !== undefined) group.parentId = input.parentId;
-    } else {
-      const values: DbValue[] = [];
-      const assignments = ["updated_at = now()"];
-      if (input.name !== undefined) {
-        values.push(input.name);
-        assignments.push(`name = $${values.length}`);
-      }
-      if (input.parentId !== undefined) {
-        values.push(input.parentId);
-        assignments.push(`parent_id = $${values.length}`);
-      }
-      values.push(id, user.id);
-      const result = await query(
-        `update prototype_groups set ${assignments.join(", ")}
-          where id = $${values.length - 1} and owner_id = $${values.length}
-          returning id`,
-        values,
-      );
-      if (!result.rows[0]) return NextResponse.json({ message: "分组不存在" }, { status: 404 });
+    const values: DbValue[] = [];
+    const assignments = ["updated_at = now()"];
+    if (input.name !== undefined) {
+      values.push(input.name);
+      assignments.push(`name = $${values.length}`);
     }
+    if (input.parentId !== undefined) {
+      values.push(input.parentId);
+      assignments.push(`parent_id = $${values.length}`);
+    }
+    values.push(id, user.id);
+    const result = await query(
+      `update prototype_groups set ${assignments.join(", ")}
+        where id = $${values.length - 1} and owner_id = $${values.length}
+        returning id`,
+      values,
+    );
+    if (!result.rows[0]) return NextResponse.json({ message: "分组不存在" }, { status: 404 });
     return NextResponse.json({ group: { ...group, ...input } });
   } catch (error) {
     const duplicate = isUniqueConstraintError(error);
@@ -103,20 +96,15 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     return NextResponse.json({ message: "分组不存在" }, { status: 404 });
   }
   const hasChildren = groups.some((item) => item.parentId === id);
-  const hasProjects = isDemoMode
-    ? demoStore.projects.some((project) => project.ownerId === user.id && project.groupId === id)
-    : Boolean((await query("select 1 from projects where owner_id = $1 and group_id = $2 limit 1", [user.id, id])).rows[0]);
+  const hasProjects = Boolean(
+    (await query("select 1 from projects where owner_id = $1 and group_id = $2 limit 1", [user.id, id])).rows[0],
+  );
   if (hasChildren || hasProjects) {
     return NextResponse.json(
       { message: "分组下存在子分组或原型，请先移动后再删除" },
       { status: 409 },
     );
   }
-  if (isDemoMode) {
-    const index = demoStore.groups.findIndex((item) => item.id === id && item.ownerId === user.id);
-    if (index >= 0) demoStore.groups.splice(index, 1);
-  } else {
-    await query("delete from prototype_groups where id = $1 and owner_id = $2", [id, user.id]);
-  }
+  await query("delete from prototype_groups where id = $1 and owner_id = $2", [id, user.id]);
   return NextResponse.json({ ok: true });
 }

@@ -1,7 +1,5 @@
 import { numberedPlaceholders, query } from "@/lib/db";
 import { withBasePath } from "@/lib/app-path";
-import { demoStore, getDemoStats } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { decryptSharePassword } from "@/lib/share-password-crypto";
 import type {
   BusinessCategory,
@@ -22,7 +20,6 @@ function isoDate(value: unknown) {
 }
 
 export async function listDepartments(): Promise<Department[]> {
-  if (isDemoMode) return demoStore.departments;
   const result = await query(
     "select id, name, parent_id, sort_order from departments order by sort_order, name",
   );
@@ -35,7 +32,6 @@ export async function listDepartments(): Promise<Department[]> {
 }
 
 export async function listCategories(): Promise<BusinessCategory[]> {
-  if (isDemoMode) return demoStore.categories;
   const result = await query(
     "select id, name, sort_order, enabled from business_categories order by sort_order, name",
   );
@@ -58,7 +54,6 @@ function mapGroup(row: Record<string, unknown>): PrototypeGroup {
 }
 
 export async function listGroups(ownerId: string): Promise<PrototypeGroup[]> {
-  if (isDemoMode) return demoStore.groups.filter((group) => group.ownerId === ownerId);
   const result = await query(
     `select id, owner_id, parent_id, name, sort_order
        from prototype_groups where owner_id = $1 order by sort_order, name`,
@@ -69,7 +64,6 @@ export async function listGroups(ownerId: string): Promise<PrototypeGroup[]> {
 
 export async function listGroupsForOwners(ownerIds: string[]): Promise<PrototypeGroup[]> {
   if (ownerIds.length === 0) return [];
-  if (isDemoMode) return demoStore.groups.filter((group) => ownerIds.includes(group.ownerId));
   const result = await query(
     `select id, owner_id, parent_id, name, sort_order
        from prototype_groups
@@ -128,17 +122,11 @@ const projectSelect = `
     left join business_categories c on c.id = p.category_id`;
 
 export async function listProjectsForOwner(ownerId: string): Promise<PrototypeProject[]> {
-  if (isDemoMode) return demoStore.projects
-    .filter((project) => project.ownerId === ownerId)
-    .map((project) => ({ ...project, sharePassword: demoStore.sharePasswords.get(project.id) ?? null }));
   const result = await query(`${projectSelect} where p.owner_id = $1 order by p.updated_at desc`, [ownerId]);
   return result.rows.map((row) => mapProject(row, true));
 }
 
 export async function listPublicProjects(): Promise<PrototypeProject[]> {
-  if (isDemoMode) return demoStore.projects
-    .filter((project) => project.isPublic)
-    .map((project) => ({ ...project, sharePassword: undefined }));
   const result = await query(`${projectSelect} where p.is_public = true order by p.updated_at desc`);
   return result.rows.map((row) => mapProject(row));
 }
@@ -147,11 +135,6 @@ export async function listProjectsForDepartments(
   departmentIds: ReadonlySet<string>,
 ): Promise<PrototypeProject[]> {
   if (departmentIds.size === 0) return [];
-  if (isDemoMode) {
-    return demoStore.projects
-      .filter((project) => departmentIds.has(project.departmentId))
-      .map((project) => ({ ...project, sharePassword: demoStore.sharePasswords.get(project.id) ?? null }));
-  }
   // SQLite 不支持数组参数，使用编号占位符展开部门列表。
   const departmentIdList = [...departmentIds];
   const result = await query(
@@ -164,10 +147,6 @@ export async function listProjectsForDepartments(
 }
 
 export async function getProjectById(projectId: string): Promise<PrototypeProject | null> {
-  if (isDemoMode) {
-    const project = demoStore.projects.find((item) => item.id === projectId);
-    return project ? { ...project, sharePassword: demoStore.sharePasswords.get(project.id) ?? null } : null;
-  }
   const result = await query(`${projectSelect} where p.id = $1`, [projectId]);
   return result.rows[0] ? mapProject(result.rows[0], true) : null;
 }
@@ -176,12 +155,6 @@ export async function getProjectByCode(
   code: string,
   route: "public" | "share",
 ): Promise<PrototypeProject | null> {
-  if (isDemoMode) {
-    const project = demoStore.projects.find((item) =>
-      route === "public" ? item.publicCode === code : item.shareCode === code,
-    );
-    return project ? { ...project, sharePassword: undefined } : null;
-  }
   const column = route === "public" ? "public_code" : "share_code";
   const result = await query(`${projectSelect} where p.${column} = $1`, [code]);
   return result.rows[0] ? mapProject(result.rows[0]) : null;
@@ -209,21 +182,14 @@ function mapUser(row: Record<string, unknown>): UserProfile {
 }
 
 export async function listUsers(): Promise<UserProfile[]> {
-  if (isDemoMode) {
-    return demoStore.users.map((user) => ({
-      ...user,
-      storageUsedBytes: demoStore.projects
-        .filter((project) => project.ownerId === user.id)
-        .reduce((total, project) => total + project.fileSize + project.previewSize, 0),
-    }));
-  }
   const result = await query(
     `select u.id, u.account, u.name, u.department_id, d.name as department_name,
             u.role, u.status, u.must_change_password, u.temp_password_expires_at,
             u.storage_quota_bytes,
             coalesce(sum(p.file_size + p.preview_size), 0) as storage_used_bytes,
             u.created_at
-       from users u join departments d on d.id = u.department_id
+       from users u
+       join departments d on d.id = u.department_id
        left join projects p on p.owner_id = u.id
       group by u.id, d.name
       order by u.created_at desc`,
@@ -232,7 +198,6 @@ export async function listUsers(): Promise<UserProfile[]> {
 }
 
 export async function listInvitations(): Promise<InvitationCode[]> {
-  if (isDemoMode) return demoStore.invitations;
   const result = await query(
     `select i.id, i.code, i.expires_at, i.used_at, i.created_at,
             coalesce(creator.name, i.created_by_name) as created_by_name,
@@ -253,17 +218,20 @@ export async function listInvitations(): Promise<InvitationCode[]> {
   }));
 }
 
+function toStats(row?: Record<string, unknown> | null): PlatformStats {
+  return {
+    pv: Number(row?.pv ?? 0),
+    uv: Number(row?.uv ?? 0),
+    uploads: Number(row?.uploads ?? 0),
+    updates: Number(row?.updates ?? 0),
+    logins: Number(row?.logins ?? 0),
+    projects: Number(row?.projects ?? 0),
+    storageBytes: Number(row?.storage_bytes ?? 0),
+  };
+}
+
 export async function getPlatformStats(): Promise<PlatformStats> {
-  if (isDemoMode) return getDemoStats();
-  const result = await query<{
-    pv: number;
-    uv: number;
-    uploads: number;
-    updates: number;
-    logins: number;
-    projects: number;
-    storage_bytes: number;
-  }>(`
+  const result = await query(`
     select
       (select count(*) from project_visits) as pv,
       (select count(distinct coalesce(user_id, visitor_key)) from project_visits) as uv,
@@ -273,50 +241,16 @@ export async function getPlatformStats(): Promise<PlatformStats> {
       (select count(*) from projects) as projects,
       (select coalesce(sum(file_size + preview_size), 0) from projects) as storage_bytes
   `);
-  const row = result.rows[0];
-  return {
-    pv: Number(row.pv),
-    uv: Number(row.uv),
-    uploads: Number(row.uploads),
-    updates: Number(row.updates),
-    logins: Number(row.logins),
-    projects: Number(row.projects),
-    storageBytes: Number(row.storage_bytes),
-  };
+  return toStats(result.rows[0]);
 }
 
 export async function getScopedPlatformStats(
   departmentIds: ReadonlySet<string>,
 ): Promise<PlatformStats> {
-  if (isDemoMode) {
-    const projects = demoStore.projects.filter((item) => departmentIds.has(item.departmentId));
-    const users = demoStore.users.filter((item) => departmentIds.has(item.departmentId));
-    const accounts = new Set(users.map((item) => item.account));
-    const pv = projects.reduce((total, item) => total + item.visitCount, 0);
-    return {
-      pv,
-      uv: Math.min(users.length, pv),
-      uploads: projects.length,
-      updates: 0,
-      logins: demoStore.loginLogs.filter((item) => item.success && accounts.has(item.account)).length,
-      projects: projects.length,
-      storageBytes: projects.reduce((total, item) => total + item.fileSize + item.previewSize, 0),
-    };
-  }
-  if (departmentIds.size === 0) {
-    return { pv: 0, uv: 0, uploads: 0, updates: 0, logins: 0, projects: 0, storageBytes: 0 };
-  }
+  if (departmentIds.size === 0) return toStats(null);
   const departmentIdList = [...departmentIds];
   const placeholders = numberedPlaceholders(departmentIdList.length);
-  const result = await query<{
-    pv: number;
-    uv: number;
-    uploads: number;
-    updates: number;
-    logins: number;
-    projects: number;
-    storage_bytes: number;
-  }>(
+  const result = await query(
     `with scoped_projects as (
        select id, file_size, preview_size from projects where department_id in (${placeholders})
      ), scoped_users as (
@@ -332,16 +266,7 @@ export async function getScopedPlatformStats(
        (select coalesce(sum(file_size + preview_size), 0) from scoped_projects) as storage_bytes`,
     [...departmentIdList, ...departmentIdList],
   );
-  const row = result.rows[0];
-  return {
-    pv: Number(row.pv),
-    uv: Number(row.uv),
-    uploads: Number(row.uploads),
-    updates: Number(row.updates),
-    logins: Number(row.logins),
-    projects: Number(row.projects),
-    storageBytes: Number(row.storage_bytes),
-  };
+  return toStats(result.rows[0]);
 }
 
 function mapLoginLog(row: Record<string, unknown>): LoginLog {
@@ -356,7 +281,6 @@ function mapLoginLog(row: Record<string, unknown>): LoginLog {
 }
 
 export async function listLoginLogs(): Promise<LoginLog[]> {
-  if (isDemoMode) return demoStore.loginLogs;
   const result = await query(
     `select l.id, l.account, l.success, l.ip_address, l.created_at, u.name as user_name
        from login_logs l left join users u on u.id = l.user_id
@@ -366,12 +290,6 @@ export async function listLoginLogs(): Promise<LoginLog[]> {
 }
 
 export async function listScopedLoginLogs(userIds: string[]): Promise<LoginLog[]> {
-  if (isDemoMode) {
-    const accounts = new Set(
-      demoStore.users.filter((item) => userIds.includes(item.id)).map((item) => item.account),
-    );
-    return demoStore.loginLogs.filter((item) => accounts.has(item.account));
-  }
   if (userIds.length === 0) return [];
   const result = await query(
     `select l.id, l.account, l.success, l.ip_address, l.created_at, u.name as user_name

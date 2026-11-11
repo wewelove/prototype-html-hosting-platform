@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { isUniqueConstraintError, query } from "@/lib/db";
-import { demoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
 import { readRequestJson } from "@/lib/request-json";
 
 const schema = z.object({
@@ -25,16 +23,6 @@ export async function POST(request: Request) {
     name: parsed.data.name,
     sortOrder: 999,
   };
-  if (isDemoMode) {
-    if (group.parentId && !demoStore.groups.some((item) => item.id === group.parentId && item.ownerId === user.id)) {
-      return NextResponse.json({ message: "上级分组不存在" }, { status: 400 });
-    }
-    if (demoStore.groups.some((item) => item.ownerId === user.id && item.parentId === group.parentId && item.name === group.name)) {
-      return NextResponse.json({ message: "该分组已存在" }, { status: 409 });
-    }
-    demoStore.groups.push(group);
-    return NextResponse.json({ group });
-  }
   try {
     if (group.parentId) {
       const parent = await query("select 1 from prototype_groups where id = $1 and owner_id = $2", [group.parentId, user.id]);
